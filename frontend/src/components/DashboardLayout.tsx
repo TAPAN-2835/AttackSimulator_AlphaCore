@@ -11,17 +11,17 @@ import { useRole } from "@/App";
 import { Badge } from "@/components/ui/badge";
 
 const navItems = [
+  { label: "Learning Portal", path: "/dashboard/learning-portal", icon: GraduationCap, role: "employee" },
   { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard, role: "admin" },
+  { label: "Analytics", path: "/dashboard/analytics", icon: BarChart3, role: "admin" },
+  { label: "Risk Scoring", path: "/dashboard/risk-scoring", icon: ShieldAlert, role: "admin" },
+  { label: "System Logs", path: "/dashboard/logs", icon: ScrollText, role: "admin" },
   { label: "Campaigns", path: "/dashboard/campaigns", icon: Target, role: "admin" },
   { label: "Simulations", path: "/dashboard/simulations", icon: Play, role: "admin" },
   { label: "User Groups", path: "/dashboard/user-groups", icon: Users, role: "admin" },
   { label: "Templates", path: "/dashboard/templates", icon: Mail, role: "admin" },
   { label: "Password Test", path: "/dashboard/password-test", icon: KeyRound },
   { label: "Response Drills", path: "/dashboard/drills", icon: Shield },
-  { label: "Learning Portal", path: "/dashboard/learning-portal", icon: GraduationCap, role: "employee" },
-  { label: "Analytics", path: "/dashboard/analytics", icon: BarChart3, role: "admin" },
-  { label: "Risk Scoring", path: "/dashboard/risk-scoring", icon: ShieldAlert, role: "admin" },
-  { label: "System Logs", path: "/dashboard/logs", icon: ScrollText, role: "admin" },
 ];
 
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
