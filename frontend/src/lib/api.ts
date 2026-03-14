@@ -134,6 +134,7 @@ export interface CampaignOut {
   id: number;
   name: string;
   description: string | null;
+  channel_type: string;
   attack_type: string;
   target_group: string | null;
   template_name: string | null;
@@ -146,6 +147,7 @@ export interface CampaignOut {
 export interface CampaignCreate {
   campaign_name: string;
   description?: string;
+  channel_type?: "EMAIL" | "SMS" | "WHATSAPP";
   attack_type: string;
   target_group?: string;
   template_id?: number;
