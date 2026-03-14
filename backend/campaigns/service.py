@@ -9,11 +9,16 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from campaigns.models import Campaign, CampaignTarget, CampaignStatus, SimulationToken, AttackType, AIGeneratedCampaign
+from campaigns.models import (
+    Campaign, CampaignTarget, CampaignStatus, SimulationToken, AttackType,
+    AIGeneratedCampaign, ChannelType, MessageTemplate,
+)
 from schemas.request_models import CampaignCreate
 from auth.models import User, UserRole
 from config import get_settings
 from utils.email_service import send_phishing_emails
+from events.logger import log_event
+from events.models import EventType
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -25,27 +30,33 @@ async def create_campaign(
     created_by: int,
 ) -> Campaign:
     try:
-        # Validate template_name
-        template_name = getattr(data, "template_name", None)
-        if template_name is None:
-            from fastapi import HTTPException
+        from fastapi import HTTPException
+        channel_type = getattr(data, "channel_type", ChannelType.EMAIL)
+        template_name = getattr(data, "template_name", None) or "password_reset"
+        template_id = getattr(data, "template_id", None)
+
+        if channel_type == ChannelType.EMAIL and not template_name:
             raise HTTPException(
                 status_code=400,
-                detail="Email template is required to launch campaign"
+                detail="Email template is required for email campaigns"
             )
-        
-        # Clean extension if provided
+        if channel_type != ChannelType.EMAIL and not template_id:
+            # SMS/WhatsApp can use template_id or a default; allow creating without and use default body at send time
+            pass
+
         if template_name.endswith(".html"):
             template_name = template_name[:-5]
 
         campaign = Campaign(
             name=data.campaign_name,
             description=data.description,
+            channel_type=channel_type,
             attack_type=data.attack_type,
             target_group=data.target_group,
             template_name=template_name,
             email_subject=getattr(data, "subject", None),
             email_body=getattr(data, "body", None),
+            template_id=template_id,
             scheduled_time=data.schedule_date,
             created_by=created_by,
             status=CampaignStatus.scheduled if data.schedule_date else CampaignStatus.draft,
@@ -94,6 +105,7 @@ async def upload_targets_from_csv(
         target = CampaignTarget(
             campaign_id=campaign_id,
             email=email,
+            phone_number=row.get("phone_number", "").strip() or row.get("phone", "").strip() or None,
             name=row.get("name", "").strip() or None,
             department=row.get("department", "").strip() or None,
         )
@@ -108,16 +120,6 @@ async def upload_targets_from_csv(
         )
         db.add(token)
         tokens.append(token)
-
-        # Log that the email is scheduled/sent
-        from events.logger import log_event
-        from events.models import EventType
-        await log_event(
-            db=db,
-            event_type=EventType.EMAIL_SENT,
-            campaign_id=campaign_id,
-            metadata={"email": email},
-        )
 
     await db.flush()
     # Email dispatch should happen on 'start_campaign', not on upload.
@@ -166,12 +168,13 @@ async def start_campaign(db: AsyncSession, campaign: Campaign) -> Campaign:
                 campaign_id=campaign.id,
                 user_id=emp.id,
                 email=emp.email,
+                phone_number=getattr(emp, "phone_number", None),
                 name=emp.name,
                 department=emp.department
             )
             db.add(target)
             new_targets.append(target)
-            
+
             token = SimulationToken(
                 token=uuid.uuid4().hex,
                 campaign_id=campaign.id,
@@ -181,7 +184,7 @@ async def start_campaign(db: AsyncSession, campaign: Campaign) -> Campaign:
             )
             db.add(token)
             new_tokens.append(token)
-            
+
         await db.flush()
         targets = new_targets
         tokens = new_tokens
@@ -189,27 +192,69 @@ async def start_campaign(db: AsyncSession, campaign: Campaign) -> Campaign:
         t_result = await db.execute(select(SimulationToken).where(SimulationToken.campaign_id == campaign.id))
         tokens = t_result.scalars().all()
 
-    # 3. Synchronously trigger dispatch via SMTP
-    try:
-        # Safe template access
-        template_name = getattr(campaign, "template_name", None)
-        template_id = getattr(campaign, "template_id", None) # Future proofing
+    tokens_list = list(tokens)
+    channel_type = getattr(campaign, "channel_type", ChannelType.EMAIL)
+    template_name = getattr(campaign, "template_name", None) or "password_reset"
+    template_id = getattr(campaign, "template_id", None)
 
-        if not template_name:
-             logger.warning(f"Campaign {campaign.id} has no template_name defined!")
-             template_name = "password_reset" # default fallback
-        
-        send_phishing_emails(
-            targets=list(targets),
-            tokens=list(tokens),
-            campaign_id=campaign.id,
-            template_name=template_name,
-            custom_subject=getattr(campaign, "email_subject", None),
-            custom_body=getattr(campaign, "email_body", None),
-        )
-    except Exception as e:
-        logger.error(f"Failed to dispatch emails: {str(e)}")
-        # Do not throw! Let the campaign be marked as started even if SMTP fails the delivery entirely
+    if channel_type == ChannelType.EMAIL:
+        try:
+            send_phishing_emails(
+                targets=list(targets),
+                tokens=tokens_list,
+                campaign_id=campaign.id,
+                template_name=template_name,
+                custom_subject=getattr(campaign, "email_subject", None),
+                custom_body=getattr(campaign, "email_body", None),
+            )
+            for t in targets:
+                t.email_sent = True
+                db.add(t)
+            await db.flush()
+            for t in targets:
+                await log_event(db, EventType.EMAIL_SENT, campaign_id=campaign.id, metadata={"email": t.email})
+        except Exception as e:
+            logger.error(f"Failed to dispatch emails: {str(e)}")
+
+    elif channel_type == ChannelType.SMS:
+        from services.sms_service import send_sms
+        body = await _get_message_body(db, campaign, template_id, channel_type,
+            default="Urgent: Your company account requires verification. Click here: {{link}}")
+        for target, token in zip(targets, tokens_list):
+            phone = getattr(target, "phone_number", None)
+            if not phone and target.user_id:
+                u = await db.get(User, target.user_id)
+                phone = u.phone_number if u else None
+            if not phone:
+                logger.warning(f"Skipping SMS for target {target.email}: no phone_number")
+                continue
+            sim_link = f"{settings.SIM_BASE_URL}/sim/{token.token}"
+            msg = body.replace("{{link}}", sim_link)
+            if send_sms(phone, msg):
+                target.sms_sent = True
+                db.add(target)
+                await log_event(db, EventType.SMS_SENT, campaign_id=campaign.id, metadata={"phone": phone, "email": target.email})
+        await db.flush()
+
+    elif channel_type == ChannelType.WHATSAPP:
+        from services.whatsapp_service import send_whatsapp
+        body = await _get_message_body(db, campaign, template_id, channel_type,
+            default="Security Alert ⚠️\nYour company login attempt requires verification.\n\nVerify now:\n{{link}}")
+        for target, token in zip(targets, tokens_list):
+            phone = getattr(target, "phone_number", None)
+            if not phone and target.user_id:
+                u = await db.get(User, target.user_id)
+                phone = u.phone_number if u else None
+            if not phone:
+                logger.warning(f"Skipping WhatsApp for target {target.email}: no phone_number")
+                continue
+            sim_link = f"{settings.SIM_BASE_URL}/sim/{token.token}"
+            msg = body.replace("{{link}}", sim_link)
+            if send_whatsapp(phone, msg):
+                target.whatsapp_sent = True
+                db.add(target)
+                await log_event(db, EventType.WHATSAPP_SENT, campaign_id=campaign.id, metadata={"phone": phone, "email": target.email})
+        await db.flush()
 
     return campaign
 
@@ -221,6 +266,21 @@ async def complete_campaign(db: AsyncSession, campaign: Campaign) -> Campaign:
     return campaign
 
 
-# ── Private helpers ───────────────────────────────────────────────────────────
-
-from utils.email_service import send_phishing_emails
+async def _get_message_body(
+    db: AsyncSession,
+    campaign: Campaign,
+    template_id: int | None,
+    channel_type: ChannelType,
+    default: str,
+) -> str:
+    """Resolve message body from message_templates or return default."""
+    if not template_id:
+        return default
+    result = await db.execute(select(MessageTemplate).where(
+        MessageTemplate.id == template_id,
+        MessageTemplate.channel_type == channel_type,
+    ))
+    template = result.scalar_one_or_none()
+    if template:
+        return template.message_body
+    return default

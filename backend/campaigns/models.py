@@ -25,18 +25,37 @@ class CampaignStatus(str, enum.Enum):
     completed = "completed"
 
 
+class ChannelType(str, enum.Enum):
+    EMAIL = "EMAIL"
+    SMS = "SMS"
+    WHATSAPP = "WHATSAPP"
+
+
+class MessageTemplate(Base):
+    __tablename__ = "message_templates"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    channel_type: Mapped[ChannelType] = mapped_column(SAEnum(ChannelType), nullable=False)
+    template_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    message_body: Mapped[str] = mapped_column(Text, nullable=False)
+
+
 class Campaign(Base):
     __tablename__ = "campaigns"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    channel_type: Mapped[ChannelType] = mapped_column(
+        SAEnum(ChannelType), default=ChannelType.EMAIL, nullable=False
+    )
     attack_type: Mapped[AttackType] = mapped_column(SAEnum(AttackType), nullable=False)
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     target_group: Mapped[str | None] = mapped_column(String(120), nullable=True)
     template_name: Mapped[str] = mapped_column(String(50), nullable=False, default="password_reset")
     email_subject: Mapped[str | None] = mapped_column(Text, nullable=True)
     email_body: Mapped[str | None] = mapped_column(Text, nullable=True)
+    template_id: Mapped[int | None] = mapped_column(ForeignKey("message_templates.id"), nullable=True)
     scheduled_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[CampaignStatus] = mapped_column(
         SAEnum(CampaignStatus), default=CampaignStatus.draft, nullable=False
@@ -55,10 +74,13 @@ class CampaignTarget(Base):
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     # For CSV-uploaded contacts who are not platform users yet
     email: Mapped[str] = mapped_column(String(255), nullable=False)
+    phone_number: Mapped[str | None] = mapped_column(String(20), nullable=True)
     name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     department: Mapped[str | None] = mapped_column(String(120), nullable=True)
     # Interaction flags
     email_sent: Mapped[bool] = mapped_column(Boolean, default=False)
+    sms_sent: Mapped[bool] = mapped_column(Boolean, default=False)
+    whatsapp_sent: Mapped[bool] = mapped_column(Boolean, default=False)
     email_opened: Mapped[bool] = mapped_column(Boolean, default=False)
     link_clicked: Mapped[bool] = mapped_column(Boolean, default=False)
     credential_attempt: Mapped[bool] = mapped_column(Boolean, default=False)

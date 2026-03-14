@@ -36,4 +36,23 @@ async def log_event(
     db.add(event)
     await db.flush()
     logger.info("[EVENT] %s | user=%s | campaign=%s | ip=%s", event_type, user_id, campaign_id, ip)
+
+    try:
+        from events.ws_manager import get_broadcaster
+        broadcaster = get_broadcaster()
+        if broadcaster.has_connections():
+            from campaigns.models import Campaign
+            from auth.models import User
+            campaign = await db.get(Campaign, campaign_id) if campaign_id else None
+            user = await db.get(User, user_id) if user_id else None
+            payload = {
+                "user": user.email if user else None,
+                "channel": campaign.channel_type.value if campaign and hasattr(campaign, "channel_type") else "EMAIL",
+                "event": event_type.value,
+                "campaign": campaign.name if campaign else None,
+            }
+            await broadcaster.broadcast(payload)
+    except Exception as e:
+        logger.debug("WebSocket broadcast skip: %s", e)
+
     return event

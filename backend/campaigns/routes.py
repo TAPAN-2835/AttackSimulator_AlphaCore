@@ -6,8 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from auth.service import CurrentUser, require_admin, require_analyst
-from campaigns.models import Campaign, CampaignStatus
+from campaigns.models import Campaign, CampaignStatus, MessageTemplate, ChannelType
 from schemas.request_models import CampaignCreate, CampaignOut, CampaignDetail
+from pydantic import BaseModel
 from campaigns.service import (
     create_campaign,
     upload_targets_from_csv,
@@ -105,3 +106,43 @@ async def delete_campaign(campaign_id: int, db: Annotated[AsyncSession, Depends(
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
     await db.delete(campaign)
+
+
+# ── Message templates (SMS / WhatsApp) ───────────────────────────────────────
+
+class MessageTemplateOut(BaseModel):
+    id: int
+    channel_type: ChannelType
+    template_name: str
+    message_body: str
+    model_config = {"from_attributes": True}
+
+
+class MessageTemplateCreate(BaseModel):
+    channel_type: ChannelType
+    template_name: str
+    message_body: str
+
+
+@router.get("/templates/list", response_model=list[MessageTemplateOut])
+async def list_templates(db: Annotated[AsyncSession, Depends(get_db)]):
+    """List all message templates (SMS and WhatsApp)."""
+    r = await db.execute(select(MessageTemplate).order_by(MessageTemplate.channel_type, MessageTemplate.template_name))
+    return r.scalars().all()
+
+
+@router.post("/templates", response_model=MessageTemplateOut, status_code=status.HTTP_201_CREATED)
+async def create_template(
+    body: MessageTemplateCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Create a new message template for SMS or WhatsApp. Use {{link}} in message_body for the phishing link."""
+    t = MessageTemplate(
+        channel_type=body.channel_type,
+        template_name=body.template_name,
+        message_body=body.message_body,
+    )
+    db.add(t)
+    await db.flush()
+    await db.refresh(t)
+    return t
