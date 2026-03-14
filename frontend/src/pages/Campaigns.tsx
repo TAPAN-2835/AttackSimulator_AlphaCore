@@ -43,6 +43,7 @@ const Campaigns = () => {
 
   // Default Form state
   const [formName, setFormName] = useState("");
+  const [formChannelType, setFormChannelType] = useState<"EMAIL" | "SMS" | "WHATSAPP">("EMAIL");
   const [formAttackType, setFormAttackType] = useState("phishing");
   const [formTargetGroup, setFormTargetGroup] = useState("");
   const [formTemplate, setFormTemplate] = useState("password_reset");
@@ -78,6 +79,7 @@ const Campaigns = () => {
     try {
       const newCampaign = await createCampaign({
         campaign_name: formName,
+        channel_type: formChannelType,
         attack_type: formAttackType,
         target_group: formTargetGroup || undefined,
         template_name: formTemplate,
@@ -86,7 +88,7 @@ const Campaigns = () => {
       setCampaigns((prev) => [newCampaign, ...prev]);
       toast.success("Campaign created!");
       setShowForm(false);
-      setFormName("");
+      setFormName(""); setFormChannelType("EMAIL"); setFormAttackType("phishing"); setFormTargetGroup(""); setFormTemplate("password_reset"); setFormSchedule("");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to create campaign";
       toast.error(message);
@@ -156,6 +158,7 @@ const Campaigns = () => {
 
   const rows = campaigns.map((c) => ({
     key: String(c.id), name: c.name,
+    channel: c.channel_type || "EMAIL",
     type: attackTypeMap[c.attack_type] || c.attack_type,
     status: c.status, targets: "—", clickRate: "—",
   }));
@@ -184,6 +187,14 @@ const Campaigns = () => {
             <div>
               <label className="text-sm text-muted-foreground block mb-1.5">Campaign Name</label>
               <Input placeholder="Q2 Awareness Test" className="bg-muted/50 border-border" value={formName} onChange={(e) => setFormName(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground block mb-1.5">Channel</label>
+              <select className="flex h-10 w-full rounded-md border border-border bg-muted/50 px-3 py-2 text-sm" value={formChannelType} onChange={(e) => setFormChannelType(e.target.value as any)}>
+                <option value="EMAIL">Email</option>
+                <option value="SMS">SMS</option>
+                <option value="WHATSAPP">WhatsApp</option>
+              </select>
             </div>
             <div>
               <label className="text-sm text-muted-foreground block mb-1.5">Attack Type</label>
@@ -345,6 +356,7 @@ const Campaigns = () => {
           <TableHeader>
             <TableRow className="border-border hover:bg-transparent">
               <TableHead>Campaign</TableHead>
+              <TableHead>Channel</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Targets</TableHead>
@@ -355,6 +367,7 @@ const Campaigns = () => {
             {rows.map((c) => (
                <TableRow key={c.key} className="border-border">
                 <TableCell className="font-medium">{c.name}</TableCell>
+                <TableCell className="text-muted-foreground">{c.channel}</TableCell>
                 <TableCell className="text-muted-foreground">{c.type}</TableCell>
                 <TableCell>
                   <Badge variant="outline" className={statusColor[c.status] || "bg-muted text-muted-foreground border-border"}>{c.status}</Badge>
@@ -365,7 +378,7 @@ const Campaigns = () => {
             ))}
             {rows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                     No campaigns found. Create your first simulation.
                   </TableCell>
                 </TableRow>

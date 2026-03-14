@@ -9,6 +9,7 @@ from analytics.models import RiskScore, RiskLevel
 from analytics.risk_engine import compute_and_save_risk, get_event_counts_for_user
 from auth.models import User, UserRole
 from campaigns.models import CampaignTarget, Campaign
+from campaigns.models import ChannelType
 from events.models import Event, EventType
 from database import get_db
 
@@ -280,7 +281,7 @@ async def run_bulk_assessment(db: Annotated[AsyncSession, Depends(get_db)]):
 @router.get("/employee-score", response_model=EmployeeScoreResponse)
 async def get_employee_score(
     email: str,
-    db: Annotated[AsyncSession, Depends(get_db)]
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
 
     user = (
@@ -302,37 +303,32 @@ async def get_employee_score(
         downloads=events.get("file_download", 0),
     )
 
+
 @router.get("/users", response_model=UserRiskListResponse)
 async def get_all_users_risk(db: Annotated[AsyncSession, Depends(get_db)]):
     """
     Returns a comprehensive list of all employees and their risk metrics.
     Useful for feeding the 'Risk Scoring' admin tab.
     """
-    # Initialize distribution counters
     dist = {"Low": 0, "Medium": 0, "High": 0, "Critical": 0}
-    
-    # Fetch all employees
+
     users = (
         await db.execute(
-            select(User)
-            .where(User.role == UserRole.employee)
+            select(User).where(User.role == UserRole.employee)
         )
     ).scalars().all()
-    
-    entries = []
-    
+
+    entries: list[UserRiskListEntry] = []
+
     for u in users:
-        # Get or compute risk
         rs = await compute_and_save_risk(db, u.id)
         counts = await get_event_counts_for_user(db, u.id)
-        
-        # In a real app, training progress would come from a 'Training' table.
-        # Here we'll simulate it based on reporting rate for visual depth.
+
         report_rate = (counts.get("reported", 0) / (counts.get("clicks", 0) + 1)) * 100
         sim_training = min(100.0, 40.0 + report_rate)
 
         entry = UserRiskListEntry(
-            name=u.name if u.name else u.email.split('@')[0],
+            name=u.name if u.name else u.email.split("@")[0],
             email=u.email,
             department=u.department or "Unknown",
             risk_level=rs.risk_level,
@@ -341,16 +337,88 @@ async def get_all_users_risk(db: Annotated[AsyncSession, Depends(get_db)]):
             credentials=counts.get("credential_attempts", 0),
             downloads=counts.get("downloads", 0),
             reported=counts.get("reported", 0),
-            training_progress=round(sim_training, 1)
+            training_progress=round(sim_training, 1),
         )
         entries.append(entry)
-        
-        # Update distribution
+
         level_str = rs.risk_level.value.capitalize()
         if level_str in dist:
             dist[level_str] += 1
         else:
-            # Handle enum naming variations if any
-            dist["High"] += 1 # Fallback
-            
+            dist["High"] += 1
+
     return UserRiskListResponse(users=entries, distribution=dist)
+
+
+# ── Channel Performance ────────────────────────────────────────────────
+
+
+class ChannelPerformanceResponse(BaseModel):
+    email_click_rate: float
+    sms_click_rate: float
+    whatsapp_click_rate: float
+    email_campaigns: int = 0
+    sms_campaigns: int = 0
+    whatsapp_campaigns: int = 0
+
+
+@router.get("/channel-performance", response_model=ChannelPerformanceResponse)
+async def channel_performance(db: Annotated[AsyncSession, Depends(get_db)]):
+    """Click rate and campaign counts by channel (EMAIL, SMS, WHATSAPP)."""
+    camp_counts = await db.execute(
+        select(Campaign.channel_type, func.count().label("cnt")).group_by(
+            Campaign.channel_type
+        )
+    )
+    by_channel = {row.channel_type: row.cnt for row in camp_counts}
+    email_campaigns = by_channel.get(ChannelType.EMAIL, 0)
+    sms_campaigns = by_channel.get(ChannelType.SMS, 0)
+    whatsapp_campaigns = by_channel.get(ChannelType.WHATSAPP, 0)
+
+    sent_by_channel: dict[str, int] = {"EMAIL": 0, "SMS": 0, "WHATSAPP": 0}
+    clicks_by_channel: dict[str, int] = {"EMAIL": 0, "SMS": 0, "WHATSAPP": 0}
+
+    for ch_enum, key in [
+        (ChannelType.EMAIL, "EMAIL"),
+        (ChannelType.SMS, "SMS"),
+        (ChannelType.WHATSAPP, "WHATSAPP"),
+    ]:
+        sent_type = {
+            "EMAIL": EventType.EMAIL_SENT,
+            "SMS": EventType.SMS_SENT,
+            "WHATSAPP": EventType.WHATSAPP_SENT,
+        }[key]
+        sent_q = await db.execute(
+            select(func.count())
+            .select_from(Event)
+            .join(Campaign, Event.campaign_id == Campaign.id)
+            .where(Campaign.channel_type == ch_enum, Event.event_type == sent_type)
+        )
+        sent_by_channel[key] = sent_q.scalar_one() or 0
+
+        click_q = await db.execute(
+            select(func.count())
+            .select_from(Event)
+            .join(Campaign, Event.campaign_id == Campaign.id)
+            .where(
+                Campaign.channel_type == ch_enum,
+                Event.event_type == EventType.LINK_CLICK,
+            )
+        )
+        clicks_by_channel[key] = click_q.scalar_one() or 0
+
+    def rate(sent: int, clicks: int) -> float:
+        return round(clicks / sent * 100, 1) if sent else 0.0
+
+    return ChannelPerformanceResponse(
+        email_click_rate=rate(
+            sent_by_channel["EMAIL"], clicks_by_channel["EMAIL"]
+        ),
+        sms_click_rate=rate(sent_by_channel["SMS"], clicks_by_channel["SMS"]),
+        whatsapp_click_rate=rate(
+            sent_by_channel["WHATSAPP"], clicks_by_channel["WHATSAPP"]
+        ),
+        email_campaigns=email_campaigns,
+        sms_campaigns=sms_campaigns,
+        whatsapp_campaigns=whatsapp_campaigns,
+    )
