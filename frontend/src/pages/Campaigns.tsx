@@ -11,9 +11,15 @@ import { toast } from "sonner";
 
 const attackTypeMap: Record<string, string> = {
   phishing: "Phishing Email",
+  spear_phishing: "Spear Phishing",
   credential_harvest: "Credential Harvest",
   malware_download: "Malware Download",
   incident_drill: "Incident Drill",
+  smishing: "Smishing (SMS)",
+  vishing: "Vishing (Voice)",
+  qr_phishing: "QR Code Phishing",
+  business_email_compromise: "BEC Attack",
+  whaling: "Whaling/Executive",
 };
 
 const statusColor: Record<string, string> = {
@@ -183,9 +189,15 @@ const Campaigns = () => {
               <label className="text-sm text-muted-foreground block mb-1.5">Attack Type</label>
               <select className="flex h-10 w-full rounded-md border border-border bg-muted/50 px-3 py-2 text-sm" value={formAttackType} onChange={(e) => setFormAttackType(e.target.value)}>
                 <option value="phishing">Phishing Email</option>
+                <option value="spear_phishing">Spear Phishing</option>
                 <option value="credential_harvest">Credential Harvest</option>
                 <option value="malware_download">Malware Download</option>
                 <option value="incident_drill">Incident Drill</option>
+                <option value="smishing">Smishing (SMS)</option>
+                <option value="vishing">Vishing (Voice)</option>
+                <option value="qr_phishing">QR Phishing</option>
+                <option value="business_email_compromise">BEC (Business Email Comp.)</option>
+                <option value="whaling">Whaling (Exec. Target)</option>
               </select>
             </div>
             <div>
@@ -237,8 +249,13 @@ const Campaigns = () => {
               <label className="text-sm text-muted-foreground block mb-1.5">Attack Type</label>
               <select className="flex h-10 w-full rounded-md border border-border bg-muted/50 px-3 py-2 text-sm" value={aiAttackType} onChange={(e) => setAiAttackType(e.target.value)}>
                 <option value="phishing">Phishing Email</option>
+                <option value="spear_phishing">Spear Phishing</option>
                 <option value="credential_harvest">Credential Harvesting</option>
                 <option value="malware_download">Malware Attachment</option>
+                <option value="smishing">SMS Phishing (Smishing)</option>
+                <option value="vishing">Voice Phishing (Vishing)</option>
+                <option value="qr_phishing">QR Code Phishing</option>
+                <option value="business_email_compromise">Business Email Compromise</option>
               </select>
             </div>
             

@@ -10,57 +10,62 @@ logger = logging.getLogger(__name__)
 
 async def initialize_database(db: AsyncSession):
     """
-    Auto-creates the default admin and 4 departmental employees if they do not exist.
+    Auto-creates default users if they do not exist.
     """
-    
-    # Check if admin already exists
-    result = await db.execute(select(User).where(User.email == "anishpatel4y@gmail.com"))
-    admin = result.scalar_one_or_none()
-    
-    if admin:
-        logger.info("Database already initialized. Found admin user.")
-        return
-
-    logger.info("Initializing database with default users...")
-
-    default_users = [
-        User(
-            email="anishpatel4y@gmail.com",
-            name="Anish Patel",
-            password_hash=hash_password("anish123"),
-            role=UserRole.admin,
-            department="security"
-        ),
-        User(
-            email="mrpatel2835@gmail.com",
-            name="Tapan Patel",
-            password_hash=hash_password("tapu123"),
-            role=UserRole.employee,
-            department="finance"
-        ),
-        User(
-            email="tejsus13@gmail.com",
-            name="Tejas",
-            password_hash=hash_password("tejas123"),
-            role=UserRole.employee,
-            department="engineering"
-        ),
-        User(
-            email="preritashukla@gmail.com",
-            name="Prerita",
-            password_hash=hash_password("prerita123"),
-            role=UserRole.employee,
-            department="hr"
-        ),
-        User(
-            email="employee4@gmail.com",
-            name="Employee Four",
-            password_hash=hash_password("password123"),
-            role=UserRole.employee,
-            department="marketing"
-        ),
+    default_users_data = [
+        {
+            "email": "anishpatel4y@gmail.com",
+            "name": "Anish Patel",
+            "password": "anish123",
+            "role": UserRole.admin,
+            "department": "security"
+        },
+        {
+            "email": "mrpatel2835@gmail.com",
+            "name": "Tapan Patel",
+            "password": "tapu123",
+            "role": UserRole.employee,
+            "department": "finance"
+        },
+        {
+            "email": "tejsus13@gmail.com",
+            "name": "Tejas",
+            "password": "tejas123",
+            "role": UserRole.employee,
+            "department": "engineering"
+        },
+        {
+            "email": "preritashukla@gmail.com",
+            "name": "Prerita",
+            "password": "prerita123",
+            "role": UserRole.employee,
+            "department": "hr"
+        },
+        {
+            "email": "anishpatel7y@gmail.com",
+            "name": "anis",
+            "password": "password123",
+            "role": UserRole.employee,
+            "department": "marketing"
+        },
     ]
 
-    db.add_all(default_users)
+    for data in default_users_data:
+        result = await db.execute(select(User).where(User.email == data["email"]))
+        existing = result.scalar_one_or_none()
+        
+        if not existing:
+            user = User(
+                email=data["email"],
+                name=data["name"],
+                password_hash=hash_password(data["password"]),
+                role=data["role"],
+                department=data["department"]
+            )
+            db.add(user)
+            logger.info(f"Added new user: {data['email']}")
+        else:
+            logger.info(f"User {data['email']} already exists.")
+
     await db.commit()
-    logger.info("Successfully inserted 5 default users.")
+    logger.info("Database initialization check complete.")

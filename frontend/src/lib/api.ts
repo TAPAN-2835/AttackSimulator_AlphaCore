@@ -215,6 +215,24 @@ export async function fetchRandomDrill(): Promise<DrillScenario> {
 
 // ── Analytics ────────────────────────────────────────────────────────────────
 
+export interface UserRiskListEntry {
+  name: string;
+  email: string;
+  department: string;
+  risk_level: string;
+  risk_score: number;
+  clicks: number;
+  credentials: number;
+  downloads: number;
+  reported: number;
+  training_progress: number;
+}
+
+export interface UserRiskListResponse {
+  users: UserRiskListEntry[];
+  distribution: Record<string, number>;
+}
+
 export interface AnalyticsOverview {
   click_rate: number;
   credential_rate: number;
@@ -241,6 +259,10 @@ export interface TrendPoint {
 
 export async function fetchAnalyticsDashboard(): Promise<AnalyticsOverview> {
   return apiFetch<AnalyticsOverview>("/analytics/dashboard");
+}
+
+export async function fetchUserRiskList(): Promise<UserRiskListResponse> {
+  return apiFetch<UserRiskListResponse>("/analytics/users");
 }
 
 export async function fetchDepartmentRisk(): Promise<DeptRiskRate[]> {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -23,6 +23,13 @@ const typeToAttackType: Record<string, string> = {
   Phishing: "phishing",
   Credential: "credential_harvest",
   Malware: "malware_download",
+  "Spear Phishing": "spear_phishing",
+  "Incident Drill": "incident_drill",
+  "Smishing (SMS)": "smishing",
+  "Vishing (Voice)": "vishing",
+  "QR Phishing": "qr_phishing",
+  "BEC Attack": "business_email_compromise",
+  "Whaling/Executive": "whaling",
 };
 
 const TypeIcon = ({ type }: { type: string }) => {
@@ -45,10 +52,27 @@ const CreateCampaign = () => {
   const navigate = useNavigate();
   const templateId = searchParams.get("templateId") ?? "";
 
-  // Resolve template from the local registry (no round-trip needed)
-  const template: SimTemplate | undefined = TEMPLATE_REGISTRY.find((t) => t.id === templateId);
+  // Resolve template from the local registry or handle "custom"
+  const template = useMemo(() => {
+    if (templateId === "custom") {
+      return {
+        id: "custom",
+        name: "Custom Campaign",
+        type: "Phishing" as const,
+        difficulty: "Medium",
+        usage: 0,
+        color: "blue",
+        subject: "",
+        body: "",
+        cta_text: "Click Here",
+        landing_page: "",
+      };
+    }
+    return TEMPLATE_REGISTRY.find((t) => t.id === templateId);
+  }, [templateId]);
 
   // ── Form state ───────────────────────────────────────────────────────────────
+  const [customAttackType, setCustomAttackType] = useState<"Phishing" | "Credential" | "Malware">("Phishing");
   const [campaignName, setCampaignName] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -57,16 +81,18 @@ const CreateCampaign = () => {
   const [scheduleDate, setScheduleDate] = useState("");
   const [departments, setDepartments] = useState<string[]>([]);
   const [launching, setLaunching] = useState(false);
+  const lastTemplateIdRef = useRef<string | null>(null);
 
-  // Pre-fill from template on mount
+  // Pre-fill from template ONLY when templateId changes
   useEffect(() => {
-    if (template) {
+    if (template && lastTemplateIdRef.current !== templateId) {
       setSubject(template.subject);
       setBody(template.body);
       const today = new Date().toISOString().slice(0, 10);
-      setCampaignName(`${template.name} — ${today}`);
+      setCampaignName(template.id === "custom" ? "" : `${template.name} — ${today}`);
+      lastTemplateIdRef.current = templateId;
     }
-  }, [template]);
+  }, [template, templateId]);
 
   // Load departments from backend
   useEffect(() => {
@@ -96,7 +122,7 @@ const CreateCampaign = () => {
     try {
       await createCampaign({
         campaign_name: campaignName,
-        attack_type: typeToAttackType[template.type] || "phishing",
+        attack_type: templateId === "custom" ? typeToAttackType[customAttackType] : (typeToAttackType[template.type] || "phishing"),
         template_name: template.id,
         subject: subject,
         body: body,
@@ -184,6 +210,24 @@ const CreateCampaign = () => {
               {template.difficulty}
             </Badge>
           </GlassCard>
+
+          {/* Attack Type Selector (Only for Custom) */}
+          {templateId === "custom" && (
+            <GlassCard>
+              <label className="text-sm font-medium text-foreground block mb-1.5">
+                Attack Type
+              </label>
+              <select
+                className="w-full h-10 rounded-md border border-border bg-muted/50 px-3 py-2 text-sm"
+                value={customAttackType}
+                onChange={(e) => setCustomAttackType(e.target.value as any)}
+              >
+                <option value="Phishing">Phishing Email</option>
+                <option value="Credential">Credential Harvest</option>
+                <option value="Malware">Malware Download</option>
+              </select>
+            </GlassCard>
+          )}
 
           {/* Campaign Name */}
           <GlassCard>

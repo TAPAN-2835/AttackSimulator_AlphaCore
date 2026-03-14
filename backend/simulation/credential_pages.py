@@ -51,6 +51,9 @@ def microsoft_login_page(user_id: int, campaign_id: int, action_url: str) -> str
       <input type="password" name="password" placeholder="Password" required>
       <button type="submit">Next</button>
     </form>
+    <div style="margin-top: 24px; text-align: center; border-top: 1px solid #eee; pt-4">
+      <a href="/sim/report?user_id={user_id}&campaign_id={campaign_id}" style="color: #6b7280; font-size: 12px; text-decoration: none;">Report suspicious email</a>
+    </div>
   </div>
 </body>
 </html>"""
@@ -79,6 +82,9 @@ def corporate_login_page(user_id: int, campaign_id: int, action_url: str) -> str
       <input type="password" name="password" placeholder="Password" required>
       <button type="submit">Sign In</button>
     </form>
+    <div style="margin-top: 24px; text-align: center; border-top: 1px solid #eee; pt-4">
+      <a href="/sim/report?user_id={user_id}&campaign_id={campaign_id}" style="color: #6b7280; font-size: 12px; text-decoration: none;">Report suspicious email</a>
+    </div>
   </div>
 </body>
 </html>"""

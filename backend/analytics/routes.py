@@ -61,6 +61,22 @@ class EmployeeScoreResponse(BaseModel):
     credentials: int
     downloads: int
 
+class UserRiskListEntry(BaseModel):
+    name: str
+    email: str
+    department: str
+    risk_level: RiskLevel
+    risk_score: float
+    clicks: int
+    credentials: int
+    downloads: int
+    reported: int
+    training_progress: float
+
+class UserRiskListResponse(BaseModel):
+    users: list[UserRiskListEntry]
+    distribution: dict[str, int]
+
 
 # ── Routes ─────────────────────────────────────────────────────────────
 
@@ -285,3 +301,56 @@ async def get_employee_score(
         credentials=events.get("credential_attempt", 0),
         downloads=events.get("file_download", 0),
     )
+
+@router.get("/users", response_model=UserRiskListResponse)
+async def get_all_users_risk(db: Annotated[AsyncSession, Depends(get_db)]):
+    """
+    Returns a comprehensive list of all employees and their risk metrics.
+    Useful for feeding the 'Risk Scoring' admin tab.
+    """
+    # Initialize distribution counters
+    dist = {"Low": 0, "Medium": 0, "High": 0, "Critical": 0}
+    
+    # Fetch all employees
+    users = (
+        await db.execute(
+            select(User)
+            .where(User.role == UserRole.employee)
+        )
+    ).scalars().all()
+    
+    entries = []
+    
+    for u in users:
+        # Get or compute risk
+        rs = await compute_and_save_risk(db, u.id)
+        counts = await get_event_counts_for_user(db, u.id)
+        
+        # In a real app, training progress would come from a 'Training' table.
+        # Here we'll simulate it based on reporting rate for visual depth.
+        report_rate = (counts.get("reported", 0) / (counts.get("clicks", 0) + 1)) * 100
+        sim_training = min(100.0, 40.0 + report_rate)
+
+        entry = UserRiskListEntry(
+            name=u.name if u.name else u.email.split('@')[0],
+            email=u.email,
+            department=u.department or "Unknown",
+            risk_level=rs.risk_level,
+            risk_score=rs.risk_score,
+            clicks=counts.get("clicks", 0),
+            credentials=counts.get("credential_attempts", 0),
+            downloads=counts.get("downloads", 0),
+            reported=counts.get("reported", 0),
+            training_progress=round(sim_training, 1)
+        )
+        entries.append(entry)
+        
+        # Update distribution
+        level_str = rs.risk_level.value.capitalize()
+        if level_str in dist:
+            dist[level_str] += 1
+        else:
+            # Handle enum naming variations if any
+            dist["High"] += 1 # Fallback
+            
+    return UserRiskListResponse(users=entries, distribution=dist)

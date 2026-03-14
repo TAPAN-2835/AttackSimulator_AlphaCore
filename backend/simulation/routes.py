@@ -59,19 +59,15 @@ async def track_link_click(
     user_id: int = Query(...),
     campaign_id: int = Query(...),
 ):
-    """
-    Requested: http://localhost:8000/track?user_id=<id>&campaign_id=<id>
-    Logs LINK_CLICK, then serves a fake login page.
-    """
-    # Verify campaign exists
-    c_result = await db.execute(select(Campaign).where(Campaign.id == campaign_id))
-    campaign = c_result.scalar_one_or_none()
+    # Fetch campaign details
+    c_res = await db.execute(select(Campaign).where(Campaign.id == campaign_id))
+    campaign = c_res.scalar_one_or_none()
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
 
     # Fetch user/target email
     u_res = await db.execute(select(CampaignTarget).where(
-        CampaignTarget.user_id == user_id, 
+        CampaignTarget.user_id == user_id,
         CampaignTarget.campaign_id == campaign_id
     ))
     target = u_res.scalar_one_or_none()
@@ -89,14 +85,16 @@ async def track_link_click(
     if target:
         target.link_clicked = True
         db.add(target)
-        await db.commit()
+
+    # Always commit to save the Event even if target update fails
+    await db.commit()
 
     if campaign.attack_type.value == "malware_download":
         from fastapi.responses import RedirectResponse
         return RedirectResponse(url=f"{settings.SIM_BASE_URL}/sim/download?user_id={user_id}&campaign_id={campaign_id}")
 
     action_url = f"{settings.SIM_BASE_URL}/sim/credential"
-    
+
     # Alternate template based on basic id heuristic
     if user_id % 2 == 0:
         html = microsoft_login_page(user_id, campaign_id, action_url)
@@ -131,10 +129,10 @@ async def credential_submit(
         campaign_id=campaign_id,
         metadata={"username_provided": username, "password_stored": False},
     )
-    
+
     # Update target stats
     u_res = await db.execute(select(CampaignTarget).where(
-        CampaignTarget.user_id == user_id, 
+        CampaignTarget.user_id == user_id,
         CampaignTarget.campaign_id == campaign_id
     ))
     target = u_res.scalar_one_or_none()
@@ -147,11 +145,16 @@ async def credential_submit(
     await compute_and_save_risk(db, user_id)
     await db.commit()
 
+    # Get campaign name for redirect link
+    c_res = await db.execute(select(Campaign).where(Campaign.id == campaign_id))
+    campaign = c_res.scalar_one_or_none()
+    camp_name = campaign.name if campaign else "Simulated"
+
     # Show premium awareness training page in frontend
     from fastapi.responses import RedirectResponse
     frontend_url = "http://localhost:5173" # Default Vite port
     return RedirectResponse(
-        url=f"{frontend_url}/training?campaign={campaign.name}&user_id={user_id}&campaign_id={campaign_id}",
+        url=f"{frontend_url}/training?campaign={camp_name}&user_id={user_id}&campaign_id={campaign_id}",
         status_code=303
     )
 
@@ -174,22 +177,22 @@ async def malware_download(
         campaign_id=campaign_id,
         metadata={"source": "simulated_malware_file"}
     )
-    
+
     u_res = await db.execute(select(CampaignTarget).where(
-        CampaignTarget.user_id == user_id, 
+        CampaignTarget.user_id == user_id,
         CampaignTarget.campaign_id == campaign_id
     ))
     target = u_res.scalar_one_or_none()
     if target:
         target.file_download = True
         db.add(target)
-        
+
     from analytics.risk_engine import compute_and_save_risk
     await compute_and_save_risk(db, user_id)
     await db.commit()
 
     file_bytes, filename = generate_dummy_file()
-    
+
     # MIME types handling
     media_type = "application/octet-stream"
     if filename.endswith(".zip"):
@@ -200,6 +203,64 @@ async def malware_download(
         media_type=media_type,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+
+
+
+@router.get("/report")
+async def report_phish(
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user_id: int = Query(...),
+    campaign_id: int = Query(...),
+):
+    """
+    Endpoint for users to report the phishing email.
+    Logs an EMAIL_REPORTED event and updates the target status.
+    """
+    await log_event(
+        db=db,
+        event_type=EventType.EMAIL_REPORTED,
+        request=request,
+        user_id=user_id,
+        campaign_id=campaign_id,
+        metadata={"source": "user_report_button"},
+    )
+
+    u_res = await db.execute(
+        select(CampaignTarget).where(
+            CampaignTarget.user_id == user_id,
+            CampaignTarget.campaign_id == campaign_id,
+        )
+    )
+    target = u_res.scalar_one_or_none()
+    if target:
+        target.reported = True
+        db.add(target)
+
+    from analytics.risk_engine import compute_and_save_risk
+    await compute_and_save_risk(db, user_id)
+    await db.commit()
+
+    return HTMLResponse(content="""
+        <html>
+            <head>
+                <style>
+                    body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0fdf4; color: #166534; text-align: center; }
+                    .card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: 1px solid #bbf7d0; }
+                    h1 { margin-top: 0; }
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    <h1>✅ Successfully Reported</h1>
+                    <p>Thank you for helping keep our organization secure.</p>
+                    <p>Our security team has been notified of this suspicious email.</p>
+                </div>
+            </body>
+        </html>
+    """)
 
 
 # ── Tracking Pixel — Email Open ───────────────────────────────────────────────

@@ -31,6 +31,12 @@ def _score_to_level(score: float) -> RiskLevel:
 
 async def compute_and_save_risk(db: AsyncSession, user_id: int) -> RiskScore:
     """Recompute risk score for a user and upsert into risk_scores."""
+    from analytics.predict import predict_risk
+    from auth.models import User
+
+    # Fetch user for department info
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    department = user.department if user else "Unknown"
 
     def count_q(event_type: EventType):
         return (
@@ -43,10 +49,10 @@ async def compute_and_save_risk(db: AsyncSession, user_id: int) -> RiskScore:
     downloads = (await db.execute(count_q(EventType.FILE_DOWNLOAD))).scalar_one()
     reported = (await db.execute(count_q(EventType.EMAIL_REPORTED))).scalar_one()
 
-    # Formula (v1 — self-contained):
-    #     score = (clicks * 20) + (cred * 40) + (downloads * 30) - (reported * 15)
-    raw_score = (clicks * 20) + (cred * 40) + (downloads * 30) - (reported * 15)
-    score = max(0.0, min(100.0, float(raw_score)))
+    # Use ML Prediction
+    # predict_risk returns 0.0 to 1.0 (probability of high risk)
+    ml_prob = predict_risk(clicks, cred, downloads, reported, department)
+    score = round(ml_prob * 100, 1)
     
     level = _score_to_level(score)
 

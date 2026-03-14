@@ -13,9 +13,15 @@ from database import Base
 
 class AttackType(str, enum.Enum):
     phishing = "phishing"
+    spear_phishing = "spear_phishing"
     credential_harvest = "credential_harvest"
     malware_download = "malware_download"
     incident_drill = "incident_drill"
+    smishing = "smishing"
+    vishing = "vishing"
+    qr_phishing = "qr_phishing"
+    business_email_compromise = "business_email_compromise"
+    whaling = "whaling"
 
 
 class CampaignStatus(str, enum.Enum):

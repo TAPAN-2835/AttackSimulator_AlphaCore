@@ -211,7 +211,7 @@ const Templates = () => {
             <h1 className="text-2xl font-bold font-display">Simulation Template Library</h1>
             <p className="text-muted-foreground text-sm mt-1">Pre-built attack scenarios and templates</p>
           </div>
-          <GlowButton>
+          <GlowButton onClick={() => navigate("/dashboard/create-campaign?templateId=custom")}>
             <PlusCircle className="h-4 w-4 mr-2" /> Create Custom
           </GlowButton>
         </div>
