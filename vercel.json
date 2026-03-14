@@ -1,0 +1,9 @@
+{
+  "//": "Ensure SPA routes like /dashboard/learning-portal are handled by the React app.",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
