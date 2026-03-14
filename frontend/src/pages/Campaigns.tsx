@@ -11,9 +11,15 @@ import { toast } from "sonner";
 
 const attackTypeMap: Record<string, string> = {
   phishing: "Phishing Email",
+  spear_phishing: "Spear Phishing",
   credential_harvest: "Credential Harvest",
   malware_download: "Malware Download",
   incident_drill: "Incident Drill",
+  smishing: "Smishing (SMS)",
+  vishing: "Vishing (Voice)",
+  qr_phishing: "QR Code Phishing",
+  business_email_compromise: "BEC Attack",
+  whaling: "Whaling/Executive",
 };
 
 const statusColor: Record<string, string> = {
@@ -37,6 +43,7 @@ const Campaigns = () => {
 
   // Default Form state
   const [formName, setFormName] = useState("");
+  const [formChannelType, setFormChannelType] = useState<"EMAIL" | "SMS" | "WHATSAPP">("EMAIL");
   const [formAttackType, setFormAttackType] = useState("phishing");
   const [formTargetGroup, setFormTargetGroup] = useState("");
   const [formTemplate, setFormTemplate] = useState("password_reset");
@@ -72,6 +79,7 @@ const Campaigns = () => {
     try {
       const newCampaign = await createCampaign({
         campaign_name: formName,
+        channel_type: formChannelType,
         attack_type: formAttackType,
         target_group: formTargetGroup || undefined,
         template_name: formTemplate,
@@ -80,7 +88,7 @@ const Campaigns = () => {
       setCampaigns((prev) => [newCampaign, ...prev]);
       toast.success("Campaign created!");
       setShowForm(false);
-      setFormName("");
+      setFormName(""); setFormChannelType("EMAIL"); setFormAttackType("phishing"); setFormTargetGroup(""); setFormTemplate("password_reset"); setFormSchedule("");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to create campaign";
       toast.error(message);
@@ -161,6 +169,7 @@ const Campaigns = () => {
 
   const rows = campaigns.map((c) => ({
     key: String(c.id), name: c.name,
+    channel: c.channel_type || "EMAIL",
     type: attackTypeMap[c.attack_type] || c.attack_type,
     status: c.status, targets: "—", clickRate: "—",
   }));
@@ -194,12 +203,26 @@ const Campaigns = () => {
               <Input placeholder="Q2 Awareness Test" className="bg-muted/50 border-border" value={formName} onChange={(e) => setFormName(e.target.value)} />
             </div>
             <div>
+              <label className="text-sm text-muted-foreground block mb-1.5">Channel</label>
+              <select className="flex h-10 w-full rounded-md border border-border bg-muted/50 px-3 py-2 text-sm" value={formChannelType} onChange={(e) => setFormChannelType(e.target.value as any)}>
+                <option value="EMAIL">Email</option>
+                <option value="SMS">SMS</option>
+                <option value="WHATSAPP">WhatsApp</option>
+              </select>
+            </div>
+            <div>
               <label className="text-sm text-muted-foreground block mb-1.5">Attack Type</label>
               <select className="flex h-10 w-full rounded-md border border-border bg-muted/50 px-3 py-2 text-sm" value={formAttackType} onChange={(e) => setFormAttackType(e.target.value)}>
                 <option value="phishing">Phishing Email</option>
+                <option value="spear_phishing">Spear Phishing</option>
                 <option value="credential_harvest">Credential Harvest</option>
                 <option value="malware_download">Malware Download</option>
                 <option value="incident_drill">Incident Drill</option>
+                <option value="smishing">Smishing (SMS)</option>
+                <option value="vishing">Vishing (Voice)</option>
+                <option value="qr_phishing">QR Phishing</option>
+                <option value="business_email_compromise">BEC (Business Email Comp.)</option>
+                <option value="whaling">Whaling (Exec. Target)</option>
               </select>
             </div>
             <div>
@@ -251,8 +274,13 @@ const Campaigns = () => {
               <label className="text-sm text-muted-foreground block mb-1.5">Attack Type</label>
               <select className="flex h-10 w-full rounded-md border border-border bg-muted/50 px-3 py-2 text-sm" value={aiAttackType} onChange={(e) => setAiAttackType(e.target.value)}>
                 <option value="phishing">Phishing Email</option>
+                <option value="spear_phishing">Spear Phishing</option>
                 <option value="credential_harvest">Credential Harvesting</option>
                 <option value="malware_download">Malware Attachment</option>
+                <option value="smishing">SMS Phishing (Smishing)</option>
+                <option value="vishing">Voice Phishing (Vishing)</option>
+                <option value="qr_phishing">QR Code Phishing</option>
+                <option value="business_email_compromise">Business Email Compromise</option>
               </select>
             </div>
             
@@ -342,6 +370,7 @@ const Campaigns = () => {
           <TableHeader>
             <TableRow className="border-border hover:bg-transparent">
               <TableHead>Campaign</TableHead>
+              <TableHead>Channel</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Targets</TableHead>
@@ -352,6 +381,7 @@ const Campaigns = () => {
             {rows.map((c) => (
                <TableRow key={c.key} className="border-border">
                 <TableCell className="font-medium">{c.name}</TableCell>
+                <TableCell className="text-muted-foreground">{c.channel}</TableCell>
                 <TableCell className="text-muted-foreground">{c.type}</TableCell>
                 <TableCell>
                   <Badge variant="outline" className={statusColor[c.status] || "bg-muted text-muted-foreground border-border"}>{c.status}</Badge>
@@ -362,7 +392,7 @@ const Campaigns = () => {
             ))}
             {rows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                     No campaigns found. Create your first simulation.
                   </TableCell>
                 </TableRow>

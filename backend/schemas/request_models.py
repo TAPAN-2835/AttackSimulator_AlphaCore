@@ -2,7 +2,7 @@ from datetime import datetime
 from pydantic import BaseModel, EmailStr
 
 from auth.models import UserRole
-from campaigns.models import AttackType, CampaignStatus
+from campaigns.models import AttackType, CampaignStatus, ChannelType
 from events.models import EventType
 
 
@@ -10,6 +10,7 @@ class RegisterRequest(BaseModel):
     name: str
     email: EmailStr
     password: str
+    phone_number: str | None = None
     role: UserRole = UserRole.employee
     department: str | None = None
 
@@ -29,6 +30,7 @@ class UserOut(BaseModel):
     id: int
     name: str
     email: str
+    phone_number: str | None = None
     role: UserRole
     department: str | None
     created_at: datetime
@@ -39,6 +41,7 @@ class UserOut(BaseModel):
 class CampaignCreate(BaseModel):
     campaign_name: str
     description: str | None = None
+    channel_type: ChannelType = ChannelType.EMAIL
     attack_type: AttackType
     target_group: str | None = None
     template_id: int | None = None
@@ -53,7 +56,6 @@ class CampaignCreate(BaseModel):
     ai_difficulty: str | None = None
     ai_tone: str | None = None
 
-    # Keep aliases or old fields if needed for transition, but here we replace for strictness
     @property
     def name(self): return self.campaign_name
     @property
@@ -64,6 +66,7 @@ class CampaignOut(BaseModel):
     id: int
     name: str
     description: str | None
+    channel_type: ChannelType
     attack_type: AttackType
     target_group: str | None
     template_name: str
@@ -79,9 +82,12 @@ class TargetOut(BaseModel):
     id: int
     campaign_id: int
     email: str
+    phone_number: str | None = None
     name: str | None
     department: str | None
     email_sent: bool
+    sms_sent: bool = False
+    whatsapp_sent: bool = False
     email_opened: bool
     link_clicked: bool
     credential_attempt: bool
@@ -102,9 +108,9 @@ class EventOut(BaseModel):
     event_type: EventType
     ip_address: str | None
     timestamp: datetime
-    # Enriched fields joined in the route
     user_email: str | None = None
     campaign_name: str | None = None
+    channel: str | None = None  # EMAIL, SMS, WHATSAPP from campaign
 
     model_config = {"from_attributes": True}
 
@@ -122,3 +128,17 @@ class AIEmailGenerateResponse(BaseModel):
     subject: str
     body: str
     cta_text: str
+
+# ------------------------------------------------------------------
+# Drills / Quizzes Models
+# ------------------------------------------------------------------
+class DrillOption(BaseModel):
+    label: str
+    score: int
+    feedback: str
+
+class DrillScenario(BaseModel):
+    title: str
+    description: str
+    difficulty: str
+    options: list[DrillOption]

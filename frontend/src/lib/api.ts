@@ -134,6 +134,7 @@ export interface CampaignOut {
   id: number;
   name: string;
   description: string | null;
+  channel_type: string;
   attack_type: string;
   target_group: string | null;
   template_name: string | null;
@@ -146,6 +147,7 @@ export interface CampaignOut {
 export interface CampaignCreate {
   campaign_name: string;
   description?: string;
+  channel_type?: "EMAIL" | "SMS" | "WHATSAPP";
   attack_type: string;
   target_group?: string;
   template_id?: number;
@@ -172,6 +174,19 @@ export interface AIEmailGenerateResponse {
   subject: string;
   body: string;
   cta_text: string;
+}
+
+export interface DrillOption {
+  label: string;
+  score: number;
+  feedback: string;
+}
+
+export interface DrillScenario {
+  title: string;
+  description: string;
+  difficulty: string;
+  options: DrillOption[];
 }
 
 export async function fetchCampaigns(): Promise<CampaignOut[]> {
@@ -202,7 +217,29 @@ export async function fetchDepartments(): Promise<string[]> {
   return apiFetch<string[]>("/admin/departments");
 }
 
+export async function fetchRandomDrill(): Promise<DrillScenario> {
+  return apiFetch<DrillScenario>("/drills/random");
+}
+
 // ── Analytics ────────────────────────────────────────────────────────────────
+
+export interface UserRiskListEntry {
+  name: string;
+  email: string;
+  department: string;
+  risk_level: string;
+  risk_score: number;
+  clicks: number;
+  credentials: number;
+  downloads: number;
+  reported: number;
+  training_progress: number;
+}
+
+export interface UserRiskListResponse {
+  users: UserRiskListEntry[];
+  distribution: Record<string, number>;
+}
 
 export interface AnalyticsOverview {
   click_rate: number;
@@ -230,6 +267,10 @@ export interface TrendPoint {
 
 export async function fetchAnalyticsDashboard(): Promise<AnalyticsOverview> {
   return apiFetch<AnalyticsOverview>("/analytics/dashboard");
+}
+
+export async function fetchUserRiskList(): Promise<UserRiskListResponse> {
+  return apiFetch<UserRiskListResponse>("/analytics/users");
 }
 
 export async function fetchDepartmentRisk(): Promise<DeptRiskRate[]> {
