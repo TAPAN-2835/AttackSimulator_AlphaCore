@@ -217,44 +217,50 @@ async def start_campaign(db: AsyncSession, campaign: Campaign) -> Campaign:
             logger.error(f"Failed to dispatch emails: {str(e)}")
 
     elif channel_type == ChannelType.SMS:
-        from services.sms_service import send_sms
-        body = await _get_message_body(db, campaign, template_id, channel_type,
-            default="Urgent: Your company account requires verification. Click here: {{link}}")
-        for target, token in zip(targets, tokens_list):
-            phone = getattr(target, "phone_number", None)
-            if not phone and target.user_id:
-                u = await db.get(User, target.user_id)
-                phone = u.phone_number if u else None
-            if not phone:
-                logger.warning(f"Skipping SMS for target {target.email}: no phone_number")
-                continue
-            sim_link = f"{settings.SIM_BASE_URL}/sim/{token.token}"
-            msg = body.replace("{{link}}", sim_link)
-            if send_sms(phone, msg):
-                target.sms_sent = True
-                db.add(target)
-                await log_event(db, EventType.SMS_SENT, campaign_id=campaign.id, metadata={"phone": phone, "email": target.email})
-        await db.flush()
+        try:
+            from services.sms_service import send_sms
+            body = await _get_message_body(db, campaign, template_id, channel_type,
+                default="Urgent: Your company account requires verification. Click here: {{link}}")
+            for target, token in zip(targets, tokens_list):
+                phone = getattr(target, "phone_number", None)
+                if not phone and target.user_id:
+                    u = await db.get(User, target.user_id)
+                    phone = u.phone_number if u else None
+                if not phone:
+                    logger.warning(f"Skipping SMS for target {target.email}: no phone_number")
+                    continue
+                sim_link = f"{settings.SIM_BASE_URL}/sim/{token.token}"
+                msg = body.replace("{{link}}", sim_link)
+                if send_sms(phone, msg):
+                    target.sms_sent = True
+                    db.add(target)
+                    await log_event(db, EventType.SMS_SENT, campaign_id=campaign.id, metadata={"phone": phone, "email": target.email})
+            await db.flush()
+        except Exception as e:
+            logger.error(f"Failed to dispatch SMS: {str(e)}")
 
     elif channel_type == ChannelType.WHATSAPP:
-        from services.whatsapp_service import send_whatsapp
-        body = await _get_message_body(db, campaign, template_id, channel_type,
-            default="Security Alert ⚠️\nYour company login attempt requires verification.\n\nVerify now:\n{{link}}")
-        for target, token in zip(targets, tokens_list):
-            phone = getattr(target, "phone_number", None)
-            if not phone and target.user_id:
-                u = await db.get(User, target.user_id)
-                phone = u.phone_number if u else None
-            if not phone:
-                logger.warning(f"Skipping WhatsApp for target {target.email}: no phone_number")
-                continue
-            sim_link = f"{settings.SIM_BASE_URL}/sim/{token.token}"
-            msg = body.replace("{{link}}", sim_link)
-            if send_whatsapp(phone, msg):
-                target.whatsapp_sent = True
-                db.add(target)
-                await log_event(db, EventType.WHATSAPP_SENT, campaign_id=campaign.id, metadata={"phone": phone, "email": target.email})
-        await db.flush()
+        try:
+            from services.whatsapp_service import send_whatsapp
+            body = await _get_message_body(db, campaign, template_id, channel_type,
+                default="Security Alert ⚠️\nYour company login attempt requires verification.\n\nVerify now:\n{{link}}")
+            for target, token in zip(targets, tokens_list):
+                phone = getattr(target, "phone_number", None)
+                if not phone and target.user_id:
+                    u = await db.get(User, target.user_id)
+                    phone = u.phone_number if u else None
+                if not phone:
+                    logger.warning(f"Skipping WhatsApp for target {target.email}: no phone_number")
+                    continue
+                sim_link = f"{settings.SIM_BASE_URL}/sim/{token.token}"
+                msg = body.replace("{{link}}", sim_link)
+                if send_whatsapp(phone, msg):
+                    target.whatsapp_sent = True
+                    db.add(target)
+                    await log_event(db, EventType.WHATSAPP_SENT, campaign_id=campaign.id, metadata={"phone": phone, "email": target.email})
+            await db.flush()
+        except Exception as e:
+            logger.error(f"Failed to dispatch WhatsApp: {str(e)}")
 
     return campaign
 

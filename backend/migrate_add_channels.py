@@ -45,6 +45,17 @@ except sqlite3.OperationalError as e:
     else:
         raise
 
+# 3b. campaigns.email_subject, email_body
+for col in ["email_subject", "email_body"]:
+    try:
+        cur.execute(f"ALTER TABLE campaigns ADD COLUMN {col} TEXT")
+        print(f"Added campaigns.{col}")
+    except sqlite3.OperationalError as e:
+        if "duplicate column" in str(e).lower():
+            print(f"campaigns.{col} already exists")
+        else:
+            raise
+
 # 4. campaigns.template_id
 try:
     cur.execute("ALTER TABLE campaigns ADD COLUMN template_id INTEGER REFERENCES message_templates(id)")
