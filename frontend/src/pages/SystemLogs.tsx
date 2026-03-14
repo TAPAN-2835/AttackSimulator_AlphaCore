@@ -8,12 +8,12 @@ import { fetchRecentEvents, type EventOut } from "@/lib/api";
 // Removed mock data
 
 const actionColor: Record<string, string> = {
-  EMAIL_OPEN: "bg-primary/20 text-primary border-primary/30",
-  EMAIL_SENT: "bg-primary/20 text-primary border-primary/30",
-  LINK_CLICK: "bg-destructive/20 text-destructive border-destructive/30",
-  CREDENTIAL_ATTEMPT: "bg-destructive/20 text-destructive border-destructive/30",
-  FILE_DOWNLOAD: "bg-secondary/20 text-secondary border-secondary/30",
-  EMAIL_REPORTED: "bg-green-500/20 text-green-400 border-green-500/30",
+  EMAIL_OPEN: "bg-primary/10 text-primary border-primary/20",
+  EMAIL_SENT: "bg-primary/10 text-primary border-primary/20",
+  LINK_CLICK: "bg-red-100 text-red-700 border-red-200",
+  CREDENTIAL_ATTEMPT: "bg-red-100 text-red-700 border-red-200",
+  FILE_DOWNLOAD: "bg-amber-100 text-amber-700 border-amber-200",
+  EMAIL_REPORTED: "bg-green-100 text-green-700 border-green-200",
 };
 
 interface LogEntry {

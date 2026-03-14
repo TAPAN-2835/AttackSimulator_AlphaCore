@@ -20,9 +20,9 @@ const distData = [
 ];
 
 const riskBadge: Record<string, string> = {
-  Low: "bg-green-500/20 text-green-400 border-green-500/30",
-  Medium: "bg-secondary/20 text-secondary border-secondary/30",
-  High: "bg-destructive/20 text-destructive border-destructive/30",
+  Low: "bg-green-100 text-green-700 border-green-200",
+  Medium: "bg-amber-100 text-amber-700 border-amber-200",
+  High: "bg-red-100 text-red-700 border-red-200",
 };
 
 const RiskScoring = () => (
@@ -36,11 +36,17 @@ const RiskScoring = () => (
       <h3 className="text-sm font-semibold font-display mb-4">Risk Distribution</h3>
       <ResponsiveContainer width="100%" height={180}>
         <BarChart data={distData} layout="vertical">
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(230,30%,18%)" />
-          <XAxis type="number" stroke="hsl(215,20%,55%)" fontSize={12} />
-          <YAxis type="category" dataKey="level" stroke="hsl(215,20%,55%)" fontSize={12} width={60} />
-          <Tooltip contentStyle={{ background: "hsl(230,40%,8%)", border: "1px solid hsl(230,30%,18%)", borderRadius: "8px", color: "hsl(210,40%,95%)" }} />
-          <Bar dataKey="count" fill="hsl(270,80%,60%)" radius={[0, 4, 4, 0]} />
+          <CartesianGrid strokeDasharray="3 3" stroke="hsl(226,20%,92%)" horizontal={false} />
+          <XAxis type="number" stroke="hsl(225,36%,73%)" fontSize={12} tickLine={false} axisLine={false} />
+          <YAxis type="category" dataKey="level" stroke="hsl(225,36%,73%)" fontSize={12} width={60} tickLine={false} axisLine={false} />
+          <Tooltip cursor={{ fill: 'hsl(226,20%,96%)' }} contentStyle={{ 
+            background: "hsl(0,0%,100%)", 
+            border: "1px solid hsl(226,20%,92%)", 
+            borderRadius: "12px", 
+            color: "hsl(222,47%,11%)",
+            boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.05)"
+          }} />
+          <Bar dataKey="count" fill="hsl(262,83%,58%)" radius={[0, 4, 4, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>

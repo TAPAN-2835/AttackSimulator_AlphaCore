@@ -17,12 +17,12 @@ const attackTypeMap: Record<string, string> = {
 };
 
 const statusColor: Record<string, string> = {
-  Active: "bg-green-500/20 text-green-400 border-green-500/30",
-  running: "bg-green-500/20 text-green-400 border-green-500/30",
-  Completed: "bg-primary/20 text-primary border-primary/30",
-  completed: "bg-primary/20 text-primary border-primary/30",
-  Scheduled: "bg-secondary/20 text-secondary border-secondary/30",
-  scheduled: "bg-secondary/20 text-secondary border-secondary/30",
+  Active: "bg-green-100 text-green-700 border-green-200",
+  running: "bg-green-100 text-green-700 border-green-200",
+  Completed: "bg-primary/10 text-primary border-primary/20",
+  completed: "bg-primary/10 text-primary border-primary/20",
+  Scheduled: "bg-blue-100 text-blue-700 border-blue-200",
+  scheduled: "bg-blue-100 text-blue-700 border-blue-200",
   Draft: "bg-muted text-muted-foreground border-border",
   draft: "bg-muted text-muted-foreground border-border",
 };
@@ -81,8 +81,9 @@ const Campaigns = () => {
       toast.success("Campaign created!");
       setShowForm(false);
       setFormName("");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to create campaign");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to create campaign";
+      toast.error(message);
     } finally {
       setCreating(false);
     }
@@ -105,8 +106,9 @@ const Campaigns = () => {
       setAiCta(response.cta_text);
       setHasGenerated(true);
       toast.success("AI Email generated successfully");
-    } catch (err: any) {
-      toast.error(err.message || "AI generation failed");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "AI generation failed";
+      toast.error(message);
     } finally {
       setGenerating(false);
     }
@@ -138,8 +140,9 @@ const Campaigns = () => {
       setAiName("");
       setAiSubject("");
       setAiBody("");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to send AI campaign");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to send AI campaign";
+      toast.error(message);
     } finally {
       setCreating(false);
     }
@@ -159,7 +162,7 @@ const Campaigns = () => {
           <p className="text-muted-foreground text-sm mt-1">Create and manage attack simulations</p>
         </div>
         <div className="flex gap-3">
-          <GlowButton onClick={() => { setShowAIForm(true); setShowForm(false); }} glowColor="cyan" className="bg-cyan-500/10 text-cyan-400 border border-cyan-500/50 hover:bg-cyan-500/20">
+          <GlowButton onClick={() => { setShowAIForm(true); setShowForm(false); }} glowColor="cyan" className="bg-cyan-100 text-cyan-700 border border-cyan-200 hover:bg-cyan-200">
             <Sparkles className="h-4 w-4 mr-2" /> AI Generator
           </GlowButton>
           <GlowButton onClick={() => { setShowForm(true); setShowAIForm(false); }}>
@@ -210,10 +213,10 @@ const Campaigns = () => {
       )}
 
       {showAIForm && (
-        <GlassCard glow="cyan" className="border-cyan-500/30 object-contain">
+        <GlassCard glow="cyan" className="border-cyan-200">
           <div className="flex items-center gap-2 mb-6">
-            <Sparkles className="h-5 w-5 text-cyan-400" />
-            <h3 className="text-lg font-semibold font-display text-cyan-400">Generate AI Phishing Email</h3>
+            <Sparkles className="h-5 w-5 text-cyan-600" />
+            <h3 className="text-lg font-semibold font-display text-cyan-700">Generate AI Phishing Email</h3>
           </div>
           
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -290,7 +293,7 @@ const Campaigns = () => {
 
           {hasGenerated && (
             <div className="mt-8 pt-6 border-t border-border space-y-4 animate-in fade-in slide-in-from-bottom-4">
-              <h4 className="font-semibold text-cyan-400">Email Composer</h4>
+              <h4 className="font-semibold text-cyan-700">Email Composer</h4>
               <p className="text-sm text-muted-foreground">The AI has generated the following email. You may edit it before launching.</p>
               
               <div className="space-y-4">

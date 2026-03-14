@@ -146,6 +146,7 @@ const PreviewModal = ({
             </p>
           </div>
 
+
           {/* Email body */}
           <div className="p-5 space-y-3 text-sm text-foreground/90">
             {template.body.split("\n").map((line, i) => {
@@ -239,22 +240,22 @@ const Templates = () => {
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredTemplates.map((template) => (
-            <GlassCard key={template.id} glow={template.color as any} className="group flex flex-col h-full">
+            <GlassCard key={template.id} glow={template.color as "blue" | "purple" | "cyan"} className="group flex flex-col h-full">
               <div className="flex items-center justify-between mb-4">
                 <div
-                  className={`p-2 rounded-lg bg-${
+                  className={`p-2 rounded-lg ${
                     template.color === "blue"
-                      ? "primary"
+                      ? "bg-blue-100"
                       : template.color === "purple"
-                      ? "secondary"
-                      : "accent"
-                  }/10`}
+                      ? "bg-violet-100"
+                      : "bg-cyan-100"
+                  }`}
                 >
-                  {template.type === "Phishing" && <Mail className="h-5 w-5 text-primary" />}
-                  {template.type === "Credential" && <KeyRound className="h-5 w-5 text-secondary" />}
-                  {template.type === "Malware" && <Bug className="h-5 w-5 text-accent" />}
+                  {template.type === "Phishing" && <Mail className="h-5 w-5 text-blue-600" />}
+                  {template.type === "Credential" && <KeyRound className="h-5 w-5 text-violet-600" />}
+                  {template.type === "Malware" && <Bug className="h-5 w-5 text-cyan-600" />}
                 </div>
-                <Badge variant="outline" className="text-[10px] uppercase tracking-wider">
+                <Badge variant="outline" className="text-[10px] uppercase tracking-wider text-muted-foreground">
                   {template.difficulty}
                 </Badge>
               </div>
