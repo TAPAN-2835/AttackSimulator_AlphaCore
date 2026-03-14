@@ -555,3 +555,42 @@ async def remove_employee(
     await db.commit()
     return {"message": "Employee removed", "employee_id": employee_id}
 
+
+@router.post("/test/email")
+async def test_email(
+    target_email: str,
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """Test SMTP settings by sending a test email."""
+    from utils.email_service import send_phishing_emails
+    from campaigns.models import CampaignTarget, SimulationToken
+    import uuid
+    from datetime import datetime, timedelta, timezone
+
+    # Create dummy target and token
+    target = CampaignTarget(
+        campaign_id=0,
+        email=target_email,
+        name="Test User"
+    )
+    token = SimulationToken(
+        token=uuid.uuid4().hex,
+        campaign_id=0,
+        target_email=target_email,
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=1)
+    )
+
+    try:
+        send_phishing_emails(
+            targets=[target],
+            tokens=[token],
+            campaign_id=0,
+            custom_subject="Test Email from Breach Platform",
+            custom_body="This is a test email to verify your SMTP settings. If you receive this, your configuration is working correctly!"
+        )
+        return {"message": "Test email sent successfully! Check your inbox (including spam)."}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"SMTP Test Failed: {str(e)}"
+        )

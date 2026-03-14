@@ -49,7 +49,10 @@ class Settings(BaseSettings):
 
     @property
     def origins_list(self) -> list[str]:
-        return [o.strip() for o in self.ALLOWED_ORIGINS.split(",")]
+        base = [o.strip() for o in self.ALLOWED_ORIGINS.split(",")]
+        # Also include trailing slash versions
+        with_slash = [f"{o}/" for o in base if not o.endswith("/")]
+        return list(set(base + with_slash))
 
 
 @lru_cache

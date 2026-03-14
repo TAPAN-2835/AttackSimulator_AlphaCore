@@ -31,12 +31,12 @@ def send_phishing_emails(
     smtp_from = getattr(settings, "SMTP_FROM", "simulator@alphacore.io")
 
     if not smtp_server or not smtp_user or not smtp_pass:
-        logger.error(
-            "[SMTP EMAIL FAILED] SMTP credentials are not configured. "
-            "Set SMTP_SERVER, SMTP_USER, and SMTP_PASSWORD in .env to send real emails. "
-            "No emails were sent."
+        error_msg = (
+            "[SMTP EMAIL FAILED] SMTP credentials are not configured in Render environment variables. "
+            "Please set SMTP_SERVER, SMTP_USER, and SMTP_PASSWORD."
         )
-        return
+        logger.error(error_msg)
+        raise ValueError(error_msg)
 
     # ── Determine rendering mode ─────────────────────────────────────────────
     use_custom_body = bool(custom_body)
@@ -140,6 +140,7 @@ def send_phishing_emails(
                     logger.info(f"[SMTP EMAIL SUCCESS] Sent to: {target.email}")
                 except Exception as send_err:
                     logger.error(f"[SMTP EMAIL FAILED] Could not send to {target.email}: {send_err}")
+                    raise send_err
 
     except smtplib.SMTPAuthenticationError as auth_err:
         logger.error(
