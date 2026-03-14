@@ -77,7 +77,7 @@ async def initialize_database(db: AsyncSession):
             "department": "hr",
         },
         {
-            "email": "anish.marketing@gmail.com",
+            "email": "anishpatel7y@gmail.com",
             "name": "Anish",
             "phone_number": "+919726396980",
             "password": "anish123",

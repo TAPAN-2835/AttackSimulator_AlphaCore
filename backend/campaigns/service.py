@@ -10,8 +10,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from campaigns.models import (
-    Campaign, CampaignTarget, CampaignStatus, SimulationToken, AttackType,
-    AIGeneratedCampaign, ChannelType, MessageTemplate,
+    Campaign,
+    CampaignTarget,
+    CampaignStatus,
+    SimulationToken,
+    AttackType,
+    AIGeneratedCampaign,
+    ChannelType,
+    MessageTemplate,
 )
 from schemas.request_models import CampaignCreate
 from auth.models import User, UserRole
@@ -24,6 +30,33 @@ settings = get_settings()
 logger = logging.getLogger(__name__)
 
 
+# Valid attack types per channel to prevent impossible combinations.
+VALID_ATTACKS_BY_CHANNEL: dict[ChannelType, set[AttackType]] = {
+    ChannelType.EMAIL: {
+        AttackType.phishing,
+        AttackType.qr_phishing,
+        AttackType.credential_harvest,
+        AttackType.malware_download,
+        AttackType.business_email_compromise,
+        AttackType.spear_phishing,
+        AttackType.incident_drill,
+        AttackType.whaling,
+    },
+    ChannelType.SMS: {
+        AttackType.phishing_link_message,
+        AttackType.otp_scam,
+        AttackType.delivery_scam,
+        AttackType.bank_alert_scam,
+    },
+    ChannelType.WHATSAPP: {
+        AttackType.phishing_link_message,
+        AttackType.fake_support_message,
+        AttackType.vishing_voice_file,
+        AttackType.payment_request_scam,
+    },
+}
+
+
 async def create_campaign(
     db: AsyncSession,
     data: CampaignCreate,
@@ -31,14 +64,24 @@ async def create_campaign(
 ) -> Campaign:
     try:
         from fastapi import HTTPException
-        channel_type = getattr(data, "channel_type", ChannelType.EMAIL)
+
+        channel_type: ChannelType = getattr(data, "channel_type", ChannelType.EMAIL)
         template_name = getattr(data, "template_name", None) or "password_reset"
         template_id = getattr(data, "template_id", None)
+
+        # Channel / attack_type compatibility validation
+        attack_type: AttackType = data.attack_type
+        allowed = VALID_ATTACKS_BY_CHANNEL.get(channel_type)
+        if allowed is not None and attack_type not in allowed:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Attack type '{attack_type.value}' is not valid for channel '{channel_type.value}'.",
+            )
 
         if channel_type == ChannelType.EMAIL and not template_name:
             raise HTTPException(
                 status_code=400,
-                detail="Email template is required for email campaigns"
+                detail="Email template is required for email campaigns",
             )
         if channel_type != ChannelType.EMAIL and not template_id:
             # SMS/WhatsApp can use template_id or a default; allow creating without and use default body at send time

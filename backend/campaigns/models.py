@@ -23,6 +23,17 @@ class AttackType(str, enum.Enum):
     business_email_compromise = "business_email_compromise"
     whaling = "whaling"
 
+    # SMS-specific scenarios
+    phishing_link_message = "phishing_link_message"
+    otp_scam = "otp_scam"
+    delivery_scam = "delivery_scam"
+    bank_alert_scam = "bank_alert_scam"
+
+    # WhatsApp-specific scenarios
+    fake_support_message = "fake_support_message"
+    vishing_voice_file = "vishing_voice_file"
+    payment_request_scam = "payment_request_scam"
+
 
 class CampaignStatus(str, enum.Enum):
     draft = "draft"

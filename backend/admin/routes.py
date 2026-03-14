@@ -11,7 +11,17 @@ from auth.service import require_admin, CurrentUser, require_analyst
 from campaigns.models import Campaign, CampaignTarget, CampaignStatus, ChannelType
 from database import get_db
 from events.models import Event
-from schemas.request_models import EventOut
+from employees.models import Employee, Group, EmployeeStatus
+from schemas.request_models import (
+    EventOut,
+    GroupOut,
+    GroupCreateRequest,
+    EmployeeOut,
+    EmployeeUpdateRequest,
+)
+from fastapi import UploadFile, File, BackgroundTasks
+import csv
+import io
 
 router = APIRouter()
 
@@ -200,4 +210,348 @@ async def list_departments(db: Annotated[AsyncSession, Depends(get_db)]):
     )
     departments = sorted(row[0] for row in result.all() if row[0])
     return departments
+
+
+# ── Employee & Group Management ────────────────────────────────────────────────
+
+
+@router.get("/groups", response_model=list[GroupOut])
+async def list_groups(db: Annotated[AsyncSession, Depends(get_db)]):
+    """Return all groups with member counts and last activity timestamp."""
+    groups = (await db.execute(select(Group))).scalars().all()
+
+    # Preload employee counts per group
+    counts = await db.execute(
+        select(Employee.department_id, func.count().label("cnt"))
+        .where(Employee.status == EmployeeStatus.active)
+        .group_by(Employee.department_id)
+    )
+    count_map = {row.department_id: row.cnt for row in counts}
+
+    # Last activity per group (based on events joined via user email -> employee email)
+    # This is a best-effort, not an exact analytic.
+    last_activity_map: dict[int, datetime | None] = {}
+    if groups:
+        # Map emails → department_id
+        emp_rows = await db.execute(
+            select(Employee.email, Employee.department_id).where(
+                Employee.status == EmployeeStatus.active
+            )
+        )
+        email_to_group: dict[str, int] = {}
+        for email, dept_id in emp_rows:
+            if dept_id is not None:
+                email_to_group[email] = dept_id
+
+        if email_to_group:
+            # Load recent events with user emails
+            ev_rows = await db.execute(
+                select(Event, User.email)
+                .join(User, User.id == Event.user_id)
+                .order_by(desc(Event.timestamp))
+                .limit(500)
+            )
+            for event, email in ev_rows:
+                dept_id = email_to_group.get(email)
+                if dept_id is None:
+                    continue
+                current = last_activity_map.get(dept_id)
+                if current is None or event.timestamp > current:
+                    last_activity_map[dept_id] = event.timestamp
+
+    out: list[GroupOut] = []
+    for g in groups:
+        out.append(
+            GroupOut(
+                group_id=g.group_id,
+                group_name=g.group_name,
+                description=g.description,
+                members=count_map.get(g.group_id, 0),
+                last_activity=last_activity_map.get(g.group_id),
+            )
+        )
+    return out
+
+
+@router.post("/groups/create", response_model=GroupOut)
+async def create_group(
+    body: GroupCreateRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    existing = (
+        await db.execute(
+            select(Group).where(func.lower(Group.group_name) == body.group_name.lower())
+        )
+    ).scalar_one_or_none()
+    if existing:
+        group = existing
+        group.description = body.description or group.description
+    else:
+        group = Group(group_name=body.group_name, description=body.description)
+        db.add(group)
+        await db.flush()
+
+    # Optionally attach members by email
+    member_emails = body.member_emails or []
+    for email in member_emails:
+        email_clean = email.strip().lower()
+        if not email_clean:
+            continue
+        emp = (
+            await db.execute(
+                select(Employee).where(Employee.email == email_clean)
+            )
+        ).scalar_one_or_none()
+        if not emp:
+            # create a minimal employee record; name will be the email local-part
+            emp = Employee(
+                name=email_clean.split("@")[0],
+                email=email_clean,
+                department_id=group.group_id,
+                status=EmployeeStatus.active,
+            )
+            db.add(emp)
+        else:
+            emp.department_id = group.group_id
+            db.add(emp)
+    await db.commit()
+
+    return GroupOut(
+        group_id=group.group_id,
+        group_name=group.group_name,
+        description=group.description,
+        members=len(member_emails or []),
+        last_activity=None,
+    )
+
+
+@router.get("/groups/{group_id}/members", response_model=list[EmployeeOut])
+async def group_members(
+    group_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    emps = (
+        await db.execute(
+            select(Employee)
+            .where(
+                Employee.department_id == group_id,
+                Employee.status == EmployeeStatus.active,
+            )
+            .order_by(Employee.created_at.desc())
+        )
+    ).scalars().all()
+    return [
+        EmployeeOut(
+            employee_id=e.employee_id,
+            name=e.name,
+            email=e.email,
+            department=str(group_id),
+            phone=e.phone,
+            status=e.status,
+        )
+        for e in emps
+    ]
+
+
+@router.post("/users/upload-csv")
+async def upload_users_csv(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    file: UploadFile = File(...),
+):
+    """Upload employees from CSV and sync with users/groups."""
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Only CSV files are accepted")
+
+    content = (await file.read()).decode("utf-8")
+    reader = csv.DictReader(io.StringIO(content))
+
+    imported = 0
+    skipped = 0
+    new_groups_created: set[str] = set()
+
+    # Cache existing groups by lowercase name
+    existing_groups = (
+        await db.execute(select(Group.group_name, Group.group_id))
+    ).all()
+    groups_by_name: dict[str, Group] = {}
+    for name, gid in existing_groups:
+        groups_by_name[name.lower()] = Group(
+            group_id=gid, group_name=name, description=None
+        )
+
+    # Existing employee/user emails
+    existing_emp_emails = {
+        e for (e,) in (await db.execute(select(Employee.email))).all()
+    }
+
+    from utils.security import hash_password
+
+    for row in reader:
+        name = (row.get("name") or "").strip()
+        email = (row.get("email") or "").strip().lower()
+        dept = (row.get("department") or "").strip()
+        phone = (row.get("phone") or "").strip()
+
+        if not email:
+            skipped += 1
+            continue
+        if email in existing_emp_emails:
+            skipped += 1
+            continue
+        if not dept:
+            skipped += 1
+            continue
+
+        # Ensure group exists
+        key = dept.lower()
+        group = groups_by_name.get(key)
+        if not group:
+            group = Group(group_name=dept, description=f"{dept} department")
+            db.add(group)
+            await db.flush()
+            groups_by_name[key] = group
+            new_groups_created.add(dept)
+
+        emp = Employee(
+            name=name or email.split("@")[0],
+            email=email,
+            department_id=group.group_id,
+            phone=phone or None,
+            status=EmployeeStatus.active,
+        )
+        db.add(emp)
+
+        # Sync into main users table for campaign targeting
+        user = (
+            await db.execute(select(User).where(User.email == email))
+        ).scalar_one_or_none()
+        if user:
+            user.name = name or user.name
+            user.phone_number = phone or user.phone_number
+            user.department = dept
+            db.add(user)
+        else:
+            # Create a non-loginable user with a random password
+            user = User(
+                name=name or email.split("@")[0],
+                email=email,
+                phone_number=phone or None,
+                password_hash=hash_password("TempPass123!"),
+                role=UserRole.employee,
+                department=dept,
+            )
+            db.add(user)
+
+        imported += 1
+        existing_emp_emails.add(email)
+
+    await db.commit()
+
+    return {
+        "imported": imported,
+        "skipped": skipped,
+        "new_groups_created": len(new_groups_created),
+    }
+
+
+@router.put("/users/update", response_model=EmployeeOut)
+async def update_employee(
+    body: EmployeeUpdateRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Edit employee details and keep users table in sync."""
+    if not body.employee_id and not body.email:
+        raise HTTPException(
+            status_code=400, detail="employee_id or email is required to update"
+        )
+
+    query = select(Employee)
+    if body.employee_id:
+        query = query.where(Employee.employee_id == body.employee_id)
+    elif body.email:
+        query = query.where(Employee.email == body.email)
+
+    emp = (await db.execute(query)).scalar_one_or_none()
+    if not emp:
+        raise HTTPException(status_code=404, detail="Employee not found")
+
+    if body.name is not None:
+        emp.name = body.name
+    if body.phone is not None:
+        emp.phone = body.phone
+    if body.status is not None:
+        emp.status = body.status
+
+    dept_name: str | None = None
+    if body.department is not None:
+        dept_name = body.department.strip() or None
+        if dept_name:
+            key = dept_name.lower()
+            group = (
+                await db.execute(
+                    select(Group).where(func.lower(Group.group_name) == key)
+                )
+            ).scalar_one_or_none()
+            if not group:
+                group = Group(group_name=dept_name, description=f"{dept_name} department")
+                db.add(group)
+                await db.flush()
+            emp.department_id = group.group_id
+        else:
+            emp.department_id = None
+
+    # Sync User record
+    user = (
+        await db.execute(select(User).where(User.email == emp.email))
+    ).scalar_one_or_none()
+    if user:
+        if body.name is not None:
+            user.name = body.name
+        if body.phone is not None:
+            user.phone_number = body.phone
+        if dept_name is not None:
+            user.department = dept_name
+        db.add(user)
+
+    db.add(emp)
+    await db.commit()
+    await db.refresh(emp)
+
+    return EmployeeOut(
+        employee_id=emp.employee_id,
+        name=emp.name,
+        email=emp.email,
+        department=dept_name,
+        phone=emp.phone,
+        status=emp.status,
+    )
+
+
+@router.post("/users/{employee_id}/remove")
+async def remove_employee(
+    employee_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Soft-remove an employee (status=removed) while keeping analytics intact."""
+    emp = (
+        await db.execute(
+            select(Employee).where(Employee.employee_id == employee_id)
+        )
+    ).scalar_one_or_none()
+    if not emp:
+        raise HTTPException(status_code=404, detail="Employee not found")
+
+    emp.status = EmployeeStatus.removed
+    db.add(emp)
+
+    # Also clear department from User to exclude from future targeting
+    user = (
+        await db.execute(select(User).where(User.email == emp.email))
+    ).scalar_one_or_none()
+    if user:
+        user.department = None
+        db.add(user)
+
+    await db.commit()
+    return {"message": "Employee removed", "employee_id": employee_id}
 
