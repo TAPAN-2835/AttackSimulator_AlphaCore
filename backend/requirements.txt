@@ -5,7 +5,8 @@ uvicorn[standard]==0.32.1
 # Async SQLite (local dev) + PostgreSQL (production)
 sqlalchemy[asyncio]>=2.0.40
 aiosqlite>=0.19.0
-# asyncpg==0.30.0  # Only needed for PostgreSQL production deployments
+asyncpg>=0.30.0
+psycopg2-binary>=2.9.9
 alembic>=1.14.0
 
 # Auth

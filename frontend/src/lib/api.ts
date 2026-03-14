@@ -394,3 +394,65 @@ export async function chatAsk(payload: ChatPayload): Promise<{ response: string 
     body: JSON.stringify(payload),
   });
 }
+
+// ── Phishing Report & VirusTotal ─────────────────────────────────────────────
+
+export interface VirusTotalResult {
+  malicious: number;
+  suspicious: number;
+  harmless: number;
+  undetected: number;
+  permalink?: string | null;
+  error?: string | null;
+  status?: string | null;
+}
+
+export interface ReportPhishingRequest {
+  user_id: number;
+  campaign_id: number;
+  reason_selected: string;
+  reported_url?: string | null;
+}
+
+export interface ReportPhishingResponse {
+  success: boolean;
+  reason_matched: boolean;
+  awareness_score: number;
+  vulnerability_score: number;
+  detection_accuracy: number;
+  correct_detection_count: number;
+  incorrect_detection_count: number;
+  vt_checked: boolean;
+  vt_result?: VirusTotalResult | null;
+}
+
+export interface CheckUrlRequest {
+  url: string;
+}
+
+export interface CheckUrlResponse {
+  checked: boolean;
+  result?: VirusTotalResult | null;
+  error?: string | null;
+}
+
+export async function reportPhishing(payload: ReportPhishingRequest): Promise<ReportPhishingResponse> {
+  return apiFetch<ReportPhishingResponse>("/events/report-phishing", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function checkUrlWithVirusTotal(payload: CheckUrlRequest): Promise<CheckUrlResponse> {
+  return apiFetch<CheckUrlResponse>("/events/check-url", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function checkFileUrlWithVirusTotal(payload: CheckUrlRequest): Promise<CheckUrlResponse> {
+  return apiFetch<CheckUrlResponse>("/events/check-file-url", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}

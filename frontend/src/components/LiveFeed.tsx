@@ -10,10 +10,6 @@ const eventToColor: Record<string, string> = {
   FILE_DOWNLOAD: "text-secondary",
 };
 
-const LiveFeed = ({ 
-  events = [], 
-  className 
-}: { 
 const LiveFeed = ({
   events = [],
   className,

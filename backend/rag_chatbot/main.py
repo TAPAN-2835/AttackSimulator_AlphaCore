@@ -2,16 +2,21 @@
 RAG Chatbot API. Exposes POST /ask for the frontend.
 Answers from DB (campaigns, reports, analytics) when relevant; else generic security tips.
 """
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
+from groq import Groq
 
 from database import get_db
+from config import get_settings
 from rag_chatbot.db_summary import answer_from_db
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
+settings = get_settings()
 
 
 class ChatAskRequest(BaseModel):
@@ -26,7 +31,7 @@ class ChatAskResponse(BaseModel):
 
 
 def _fallback_response(query: str) -> str:
-    """Fallback when RAG/LLM deps are not installed."""
+    """Fallback when RAG/LLM deps are not installed or key is missing."""
     q = (query or "").strip().lower()
     if not q:
         return "Ask me anything about phishing, security awareness, or how to spot suspicious emails."
@@ -57,13 +62,54 @@ def _fallback_response(query: str) -> str:
     )
 
 
+async def get_ai_response(query: str, context: str | None = None) -> str | None:
+    """Call Groq LLM with context for a smart answer."""
+    if not settings.GROQ_API_KEY:
+        logger.warning("GROQ_API_KEY not set; using fallback logic.")
+        return None
+
+    try:
+        client = Groq(api_key=settings.GROQ_API_KEY)
+        system_prompt = (
+            "You are 'Breach Assistant', a friendly security awareness expert. "
+            "Your goal is to help users understand phishing, social engineering, and security best practices. "
+            "If context about the user's simulation campaigns or analytics is provided, use it to answer precisely. "
+            "Otherwise, provide general, helpful security advice. Keep answers concise."
+        )
+        
+        user_prompt = query
+        if context:
+            user_prompt = f"System Context (Current Database Data):\n{context}\n\nUser Question: {query}"
+
+        completion = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.6,
+            max_tokens=512,
+        )
+        return completion.choices[0].message.content
+    except Exception as e:
+        logger.error("Groq AI call failed: %s", e)
+        return None
+
+
 @router.post("/ask", response_model=ChatAskResponse)
 async def ask(
     body: ChatAskRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ChatAskResponse:
     """Handle a chat message. Answers from DB when query is about campaigns/reports/analytics, else security tips."""
-    response = await answer_from_db(db, body.query)
+    # 1. Try to get real-time context from DB
+    context = await answer_from_db(db, body.query)
+    
+    # 2. Try to get a smart answer from AI
+    response = await get_ai_response(body.query, context)
+    
+    # 3. Fallback if AI fails or key is missing
     if response is None:
-        response = _fallback_response(body.query)
+        response = context if context else _fallback_response(body.query)
+        
     return ChatAskResponse(response=response)
