@@ -19,6 +19,7 @@ import PasswordTest from "./pages/PasswordTest";
 import ResponseDrills from "./pages/ResponseDrills";
 import EmployeeDashboard from "./pages/EmployeeDashboard";
 import TrainingPage from "./pages/TrainingPage";
+import Chat from "./pages/Chat";
 import NotFound from "./pages/NotFound";
 import CreateCampaign from "./pages/CreateCampaign";
 
@@ -80,6 +81,7 @@ const App = () => {
               <Route path="/dashboard/create-campaign" element={<DashboardPage requiredRole="admin"><CreateCampaign /></DashboardPage>} />
               
               {/* Shared/Utility Routes */}
+              <Route path="/dashboard/chat" element={<DashboardPage><Chat /></DashboardPage>} />
               <Route path="/dashboard/password-test" element={<DashboardPage><PasswordTest /></DashboardPage>} />
               <Route path="/dashboard/drills" element={<DashboardPage><ResponseDrills /></DashboardPage>} />
               

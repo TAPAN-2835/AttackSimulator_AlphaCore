@@ -3,6 +3,7 @@ import { type EventOut } from "@/lib/api";
 
 const eventToColor: Record<string, string> = {
   EMAIL_OPEN: "text-primary",
+  EMAIL_SENT: "text-primary",
   LINK_CLICK: "text-destructive",
   CREDENTIAL_ATTEMPT: "text-destructive",
   EMAIL_REPORTED: "text-green-400",
@@ -13,12 +14,21 @@ const LiveFeed = ({
   events = [], 
   className 
 }: { 
+const LiveFeed = ({
+  events = [],
+  className,
+}: {
   events?: EventOut[];
   className?: string;
 }) => {
   const formatTime = (ts: string) => {
     try {
       return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      return new Date(ts).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
     } catch {
       return "--:--:--";
     }

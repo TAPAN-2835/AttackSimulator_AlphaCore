@@ -3,7 +3,7 @@ from functools import lru_cache
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # App
     APP_NAME: str = "Breach"
@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str | None = None
     ANTHROPIC_API_KEY: str | None = None
     GEMINI_API_KEY: str | None = None
+
+    # VirusTotal (optional — for URL check when reporting phishing)
+    VIRUSTOTAL_API_KEY: str = ""
 
     @property
     def origins_list(self) -> list[str]:

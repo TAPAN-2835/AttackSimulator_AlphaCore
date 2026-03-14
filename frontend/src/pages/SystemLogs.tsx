@@ -22,20 +22,40 @@ interface LogEntry {
   campaign: string;
   time: string;
   ip: string;
+  metaReason?: string;
 }
+
+const formatIndicatorLabel = (raw: string) => {
+  const map: Record<string, string> = {
+    urgent_language: "Urgent/Threatening Language",
+    suspicious_link: "Suspicious Link",
+    domain_mismatch: "Domain Mismatch",
+    fake_login_page: "Fake Login Page",
+    suspicious_attachment: "Suspicious Attachment",
+    unusual_request: "Unusual Request",
+  };
+  return map[raw] || raw;
+};
 
 const SystemLogs = () => {
   const [filter, setFilter] = useState("");
   const [logs, setLogs] = useState<LogEntry[]>([]);
 
   useEffect(() => {
-    const toLogEntry = (e: EventOut): LogEntry => ({
-      user: e.user_email || `user_${e.user_id ?? "—"}`,
-      action: e.event_type,
-      campaign: e.campaign_name || `campaign_${e.campaign_id ?? "—"}`,
-      time: new Date(e.timestamp).toLocaleTimeString(),
-      ip: e.ip_address || "—",
-    });
+    const toLogEntry = (e: EventOut): LogEntry => {
+      let metaReason;
+      if (e.event_type === "EMAIL_REPORTED" && e.metadata_?.reason_selected) {
+         metaReason = formatIndicatorLabel(e.metadata_.reason_selected);
+      }
+      return {
+        user: e.user_email || `user_${e.user_id ?? "—"}`,
+        action: e.event_type,
+        campaign: e.campaign_name || `campaign_${e.campaign_id ?? "—"}`,
+        time: new Date(e.timestamp).toLocaleTimeString(),
+        ip: e.ip_address || "—",
+        metaReason
+      };
+    };
 
     // Fetch once immediately, then poll every 5 seconds
     const loadEvents = () => {
@@ -58,7 +78,8 @@ const SystemLogs = () => {
     (l) =>
       l.user.toLowerCase().includes(filter.toLowerCase()) ||
       l.action.includes(filter.toUpperCase()) ||
-      l.campaign.toLowerCase().includes(filter.toLowerCase())
+      l.campaign.toLowerCase().includes(filter.toLowerCase()) ||
+      (l.metaReason && l.metaReason.toLowerCase().includes(filter.toLowerCase()))
   );
 
   return (
@@ -95,7 +116,12 @@ const SystemLogs = () => {
                 <TableCell className="text-muted-foreground">{l.time}</TableCell>
                 <TableCell>{l.user}</TableCell>
                 <TableCell>
-                  <Badge variant="outline" className={actionColor[l.action] || "bg-muted text-muted-foreground border-border"}>{l.action}</Badge>
+                  <div className="flex flex-col gap-1 items-start">
+                    <Badge variant="outline" className={actionColor[l.action] || "bg-muted text-muted-foreground border-border"}>{l.action}</Badge>
+                    {l.metaReason && (
+                      <span className="text-[10px] text-muted-foreground italic">Reason: {l.metaReason}</span>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell className="text-muted-foreground">{l.campaign}</TableCell>
                 <TableCell className="text-muted-foreground">{l.ip}</TableCell>

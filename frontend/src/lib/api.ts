@@ -120,6 +120,7 @@ export interface EventOut {
   event_type: string;
   ip_address: string | null;
   timestamp: string;
+  metadata_?: Record<string, any> | null;
   user_email: string | null;
   campaign_name: string | null;
 }

@@ -4,7 +4,7 @@ from datetime import datetime
 
 from sqlalchemy import (
     String, Text, Enum as SAEnum, DateTime, ForeignKey,
-    Boolean, func, Integer
+    Boolean, func, Integer, JSON
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -78,6 +78,7 @@ class Campaign(Base):
         SAEnum(CampaignStatus), default=CampaignStatus.draft, nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    attack_indicators: Mapped[list | None] = mapped_column(JSON, nullable=True)
 
     targets: Mapped[list["CampaignTarget"]] = relationship(back_populates="campaign")
     tokens: Mapped[list["SimulationToken"]] = relationship(back_populates="campaign")

@@ -4,6 +4,7 @@ import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, R
 import StatCard from "@/components/StatCard";
 import LiveFeed from "@/components/LiveFeed";
 import GlassCard from "@/components/GlassCard";
+import VirusTotalCheck from "@/components/VirusTotalCheck";
 import {
   fetchAdminDashboard, fetchAnalyticsDashboard, fetchRecentEvents, fetchUsers, fetchCampaignTrend,
   type DashboardOverview, type AnalyticsOverview, type EventOut, type UserWithRisk, type TrendPoint
@@ -139,6 +140,8 @@ const Dashboard = () => {
               ))}
             </div>
           </GlassCard>
+
+          <VirusTotalCheck compact title="Check link with VirusTotal" glow="cyan" />
 
           <GlassCard glow="purple" className="p-5">
             <h3 className="text-sm font-semibold font-display mb-4 flex items-center gap-2">
