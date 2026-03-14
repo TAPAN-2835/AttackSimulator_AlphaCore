@@ -10,6 +10,10 @@ const eventToColor: Record<string, string> = {
   FILE_DOWNLOAD: "text-secondary",
 };
 
+const LiveFeed = ({ 
+  events = [], 
+  className 
+}: { 
 const LiveFeed = ({
   events = [],
   className,
@@ -19,6 +23,7 @@ const LiveFeed = ({
 }) => {
   const formatTime = (ts: string) => {
     try {
+      return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       return new Date(ts).toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
@@ -37,28 +42,14 @@ const LiveFeed = ({
       </div>
       <div className="h-64 overflow-hidden relative font-mono text-xs">
         <div className={cn(events.length > 8 ? "animate-scroll-feed" : "")}>
-          {events.map((e, i) => (
-            <div
-              key={i}
-              className="flex items-center gap-3 px-4 py-2 border-b border-border/50 hover:bg-muted/30"
-            >
-              <span className="text-muted-foreground w-16 shrink-0">
-                {formatTime(e.timestamp)}
-              </span>
-              <span className="text-foreground/70 w-40 shrink-0 truncate">
-                {e.user_email || "unknown@user"}
-              </span>
-              <span
-                className={cn(
-                  "font-bold w-36 shrink-0",
-                  eventToColor[e.event_type] || "text-foreground"
-                )}
-              >
+          {(events.length > 0 ? events : []).map((e, i) => (
+            <div key={i} className="flex items-center gap-3 px-4 py-2 border-b border-border/50 hover:bg-muted/30">
+              <span className="text-muted-foreground w-16 shrink-0">{formatTime(e.timestamp)}</span>
+              <span className="text-foreground/70 w-40 shrink-0 truncate">{e.user_email || "unknown@user"}</span>
+              <span className={cn("font-bold w-36 shrink-0", eventToColor[e.event_type] || "text-foreground")}>
                 {e.event_type.replace("_", " ")}
               </span>
-              <span className="text-muted-foreground truncate">
-                {e.campaign_name || "Training"}
-              </span>
+              <span className="text-muted-foreground truncate">{e.campaign_name || "Training"}</span>
             </div>
           ))}
           {events.length === 0 && (
