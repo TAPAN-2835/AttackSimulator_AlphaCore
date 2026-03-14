@@ -8,19 +8,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { fetchCampaigns, createCampaign, fetchDepartments, generateAIEmail, clearAllCampaigns, type CampaignOut } from "@/lib/api";
 import { toast } from "sonner";
+import { attackOptionsByChannel, type ChannelKey } from "@/config/attackChannels";
 
-const attackTypeMap: Record<string, string> = {
-  phishing: "Phishing Email",
-  spear_phishing: "Spear Phishing",
-  credential_harvest: "Credential Harvest",
-  malware_download: "Malware Download",
-  incident_drill: "Incident Drill",
-  smishing: "Smishing (SMS)",
-  vishing: "Vishing (Voice)",
-  qr_phishing: "QR Code Phishing",
-  business_email_compromise: "BEC Attack",
-  whaling: "Whaling/Executive",
-};
+const attackTypeMap: Record<string, string> = Object.values(attackOptionsByChannel)
+  .flat()
+  .reduce<Record<string, string>>((acc, opt) => {
+    acc[opt.value] = opt.label;
+    return acc;
+  }, {});
 
 const statusColor: Record<string, string> = {
   Active: "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800",
@@ -43,15 +38,20 @@ const Campaigns = () => {
 
   // Default Form state
   const [formName, setFormName] = useState("");
-  const [formChannelType, setFormChannelType] = useState<"EMAIL" | "SMS" | "WHATSAPP">("EMAIL");
-  const [formAttackType, setFormAttackType] = useState("phishing");
+  const [formChannelType, setFormChannelType] = useState<ChannelKey>("EMAIL");
+  const [formAttackType, setFormAttackType] = useState<string>(
+    attackOptionsByChannel["EMAIL"][0]?.value ?? "phishing",
+  );
   const [formTargetGroup, setFormTargetGroup] = useState("");
   const [formTemplate, setFormTemplate] = useState("password_reset");
   const [formSchedule, setFormSchedule] = useState("");
 
   // AI Form state
   const [aiName, setAiName] = useState("");
-  const [aiAttackType, setAiAttackType] = useState("phishing");
+  const [aiChannelType, setAiChannelType] = useState<ChannelKey>("EMAIL");
+  const [aiAttackType, setAiAttackType] = useState<string>(
+    attackOptionsByChannel["EMAIL"][0]?.value ?? "phishing",
+  );
   const [aiTheme, setAiTheme] = useState("Microsoft Login");
   const [aiDifficulty, setAiDifficulty] = useState("Medium");
   const [aiDepartment, setAiDepartment] = useState("");
@@ -73,6 +73,20 @@ const Campaigns = () => {
       .catch(() => toast.error("Failed to load departments"));
   }, []);
 
+  // When the standard form channel changes, reset the attack type list + selection
+  const handleFormChannelChange = (next: ChannelKey) => {
+    setFormChannelType(next);
+    const first = attackOptionsByChannel[next][0];
+    setFormAttackType(first ? first.value : "");
+  };
+
+  // When the AI generator channel changes, reset its attack types as well
+  const handleAiChannelChange = (next: ChannelKey) => {
+    setAiChannelType(next);
+    const first = attackOptionsByChannel[next][0];
+    setAiAttackType(first ? first.value : "");
+  };
+
   const handleCreateStandard = async () => {
     if (!formName) { toast.error("Campaign name is required"); return; }
     setCreating(true);
@@ -88,7 +102,12 @@ const Campaigns = () => {
       setCampaigns((prev) => [newCampaign, ...prev]);
       toast.success("Campaign created!");
       setShowForm(false);
-      setFormName(""); setFormChannelType("EMAIL"); setFormAttackType("phishing"); setFormTargetGroup(""); setFormTemplate("password_reset"); setFormSchedule("");
+      setFormName("");
+      setFormChannelType("EMAIL");
+      setFormAttackType(attackOptionsByChannel["EMAIL"][0]?.value ?? "phishing");
+      setFormTargetGroup("");
+      setFormTemplate("password_reset");
+      setFormSchedule("");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to create campaign";
       toast.error(message);
@@ -101,8 +120,12 @@ const Campaigns = () => {
     if (!aiDepartment) { toast.error("Please select a target department"); return; }
     setGenerating(true);
     try {
+      const attackOptions = attackOptionsByChannel[aiChannelType];
+      const attackLabel =
+        attackOptions.find((opt) => opt.value === aiAttackType)?.label ?? aiAttackType;
+
       const response = await generateAIEmail({
-        attack_type: aiAttackType,
+        attack_type: `Channel: ${aiChannelType} | Attack Type: ${attackLabel}`,
         theme: aiTheme,
         difficulty: aiDifficulty,
         department: aiDepartment,
@@ -130,6 +153,7 @@ const Campaigns = () => {
     try {
       const newCampaign = await createCampaign({
         campaign_name: aiName,
+        channel_type: aiChannelType,
         attack_type: aiAttackType,
         target_group: aiDepartment,
         template_name: "custom_ai",
@@ -146,6 +170,8 @@ const Campaigns = () => {
       setShowAIForm(false);
       setHasGenerated(false);
       setAiName("");
+      setAiChannelType("EMAIL");
+      setAiAttackType(attackOptionsByChannel["EMAIL"][0]?.value ?? "phishing");
       setAiSubject("");
       setAiBody("");
     } catch (err: unknown) {
@@ -204,7 +230,11 @@ const Campaigns = () => {
             </div>
             <div>
               <label className="text-sm text-muted-foreground block mb-1.5">Channel</label>
-              <select className="flex h-10 w-full rounded-md border border-border bg-muted/50 px-3 py-2 text-sm" value={formChannelType} onChange={(e) => setFormChannelType(e.target.value as any)}>
+              <select
+                className="flex h-10 w-full rounded-md border border-border bg-muted/50 px-3 py-2 text-sm"
+                value={formChannelType}
+                onChange={(e) => handleFormChannelChange(e.target.value as ChannelKey)}
+              >
                 <option value="EMAIL">Email</option>
                 <option value="SMS">SMS</option>
                 <option value="WHATSAPP">WhatsApp</option>
@@ -212,17 +242,16 @@ const Campaigns = () => {
             </div>
             <div>
               <label className="text-sm text-muted-foreground block mb-1.5">Attack Type</label>
-              <select className="flex h-10 w-full rounded-md border border-border bg-muted/50 px-3 py-2 text-sm" value={formAttackType} onChange={(e) => setFormAttackType(e.target.value)}>
-                <option value="phishing">Phishing Email</option>
-                <option value="spear_phishing">Spear Phishing</option>
-                <option value="credential_harvest">Credential Harvest</option>
-                <option value="malware_download">Malware Download</option>
-                <option value="incident_drill">Incident Drill</option>
-                <option value="smishing">Smishing (SMS)</option>
-                <option value="vishing">Vishing (Voice)</option>
-                <option value="qr_phishing">QR Phishing</option>
-                <option value="business_email_compromise">BEC (Business Email Comp.)</option>
-                <option value="whaling">Whaling (Exec. Target)</option>
+              <select
+                className="flex h-10 w-full rounded-md border border-border bg-muted/50 px-3 py-2 text-sm"
+                value={formAttackType}
+                onChange={(e) => setFormAttackType(e.target.value)}
+              >
+                {attackOptionsByChannel[formChannelType].map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
@@ -271,16 +300,29 @@ const Campaigns = () => {
               </select>
             </div>
             <div>
+              <label className="text-sm text-muted-foreground block mb-1.5">Channel</label>
+              <select
+                className="flex h-10 w-full rounded-md border border-border bg-muted/50 px-3 py-2 text-sm"
+                value={aiChannelType}
+                onChange={(e) => handleAiChannelChange(e.target.value as ChannelKey)}
+              >
+                <option value="EMAIL">Email</option>
+                <option value="SMS">SMS</option>
+                <option value="WHATSAPP">WhatsApp</option>
+              </select>
+            </div>
+            <div>
               <label className="text-sm text-muted-foreground block mb-1.5">Attack Type</label>
-              <select className="flex h-10 w-full rounded-md border border-border bg-muted/50 px-3 py-2 text-sm" value={aiAttackType} onChange={(e) => setAiAttackType(e.target.value)}>
-                <option value="phishing">Phishing Email</option>
-                <option value="spear_phishing">Spear Phishing</option>
-                <option value="credential_harvest">Credential Harvesting</option>
-                <option value="malware_download">Malware Attachment</option>
-                <option value="smishing">SMS Phishing (Smishing)</option>
-                <option value="vishing">Voice Phishing (Vishing)</option>
-                <option value="qr_phishing">QR Code Phishing</option>
-                <option value="business_email_compromise">Business Email Compromise</option>
+              <select
+                className="flex h-10 w-full rounded-md border border-border bg-muted/50 px-3 py-2 text-sm"
+                value={aiAttackType}
+                onChange={(e) => setAiAttackType(e.target.value)}
+              >
+                {attackOptionsByChannel[aiChannelType].map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
               </select>
             </div>
             
