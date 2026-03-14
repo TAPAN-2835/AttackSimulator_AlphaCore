@@ -360,7 +360,7 @@ export async function uploadEmployeesCsv(file: File): Promise<UploadSummary> {
   const formData = new FormData();
   formData.append("file", file);
 
-  const res = await fetch(`/api/admin/users/upload-csv`, {
+  const res = await fetch(`${API_BASE}/admin/users/upload-csv`, {
     method: "POST",
     body: formData,
   });
