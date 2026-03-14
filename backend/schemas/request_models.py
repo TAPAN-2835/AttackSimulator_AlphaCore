@@ -122,3 +122,17 @@ class AIEmailGenerateResponse(BaseModel):
     subject: str
     body: str
     cta_text: str
+
+# ------------------------------------------------------------------
+# Drills / Quizzes Models
+# ------------------------------------------------------------------
+class DrillOption(BaseModel):
+    label: str
+    score: int
+    feedback: str
+
+class DrillScenario(BaseModel):
+    title: str
+    description: str
+    difficulty: str
+    options: list[DrillOption]

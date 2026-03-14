@@ -1,60 +1,60 @@
-import { useState } from "react";
-import { ShieldCheck, AlertTriangle, ArrowRight, RotateCcw, HelpCircle, Shield, HandMetal, Eye, BellRing, Info } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ShieldCheck, AlertTriangle, ArrowRight, RotateCcw, HelpCircle, Shield, HandMetal, Eye, BellRing, Info, Loader2 } from "lucide-react";
 import GlassCard from "@/components/GlassCard";
 import GlowButton from "@/components/GlowButton";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-
-const scenarios = [
-  {
-    id: 1,
-    title: "The Mysterious USB Drive",
-    description: "You find an unlabeled USB flash drive on the floor of the breakroom. It's high quality and looks expensive.",
-    options: [
-      { label: "Plug it in to see who it belongs to", score: -50, feedback: "DANGEROUS: USB drives are a common vector for hardware-level malware (BadUSB). Never plug in unknown hardware.", icon: AlertTriangle },
-      { label: "Leave it there and ignore it", score: 0, feedback: "NEUTRAL: While safe for you, another employee might plug it in. Reporting it is better.", icon: Eye },
-      { label: "Take it to the IT Security desk immediately", score: 100, feedback: "EXCELLENT: Reporting unknown hardware to professionals is the standard security protocol.", icon: ShieldCheck },
-    ],
-    difficulty: "Low"
-  },
-  {
-    id: 2,
-    title: "The Urgent Phone Call",
-    description: "A caller claiming to be from 'Internal IT' says your workstation is sending out error logs. They need you to install a remote support tool 'immediately' to prevent a system crash.",
-    options: [
-      { label: "Follow their instructions and install the tool", score: -70, feedback: "DANGEROUS: This is a classic social engineering attack. IT will never ask you to install unverified software.", icon: AlertTriangle },
-      { label: "Ask for their employee ID and call back on the official IT number", score: 100, feedback: "EXCELLENT: Out-of-band verification is the best way to stop social engineering.", icon: ShieldCheck },
-      { label: "Tell them you're busy and hang up", score: 30, feedback: "GOOD: You avoided the trap, but the attacker might target someone else. You should also report the call.", icon: BellRing },
-    ],
-    difficulty: "Medium"
-  }
-];
+import { fetchRandomDrill, type DrillScenario } from "@/lib/api";
 
 const ResponseDrills = () => {
-  const [currentScenario, setCurrentScenario] = useState(0);
+  const [drill, setDrill] = useState<DrillScenario | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [drillCount, setDrillCount] = useState(1);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [userScore, setUserScore] = useState(0);
   const [drillCompleted, setDrillCompleted] = useState(false);
 
+  // Maximum number of drills per session
+  const MAX_DRILLS = 3;
+
+  const loadDrill = async () => {
+    setLoading(true);
+    setSelectedOption(null);
+    try {
+      const data = await fetchRandomDrill();
+      setDrill(data);
+    } catch (err) {
+      toast.error("Failed to generate a new AI scenario.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDrill();
+  }, []);
+
   const handleOptionSelect = (index: number) => {
+    if (!drill) return;
     setSelectedOption(index);
-    setUserScore(prev => prev + scenarios[currentScenario].options[index].score);
+    setUserScore(prev => prev + drill.options[index].score);
   };
 
   const nextScenario = () => {
-    if (currentScenario < scenarios.length - 1) {
-      setCurrentScenario(prev => prev + 1);
-      setSelectedOption(null);
+    if (drillCount < MAX_DRILLS) {
+      setDrillCount(prev => prev + 1);
+      loadDrill();
     } else {
       setDrillCompleted(true);
     }
   };
 
   const restartDrill = () => {
-    setCurrentScenario(0);
+    setDrillCount(1);
     setSelectedOption(null);
     setUserScore(0);
     setDrillCompleted(false);
+    loadDrill();
   };
 
   if (drillCompleted) {
@@ -77,68 +77,92 @@ const ResponseDrills = () => {
     );
   }
 
-  const scenario = scenarios[currentScenario];
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+        <Loader2 className="h-12 w-12 text-primary animate-spin" />
+        <p className="text-muted-foreground font-mono">AI compiling targeted threat scenario...</p>
+      </div>
+    );
+  }
+
+  if (!drill) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+        <AlertTriangle className="h-12 w-12 text-destructive" />
+        <p className="text-muted-foreground font-mono">Failed to load scenario.</p>
+        <GlowButton onClick={loadDrill}>Retry Connection</GlowButton>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold font-display">Incident Response Drill</h1>
-          <p className="text-muted-foreground text-sm mt-1">Scenario {currentScenario + 1} of {scenarios.length}</p>
+          <p className="text-muted-foreground text-sm mt-1">AI Generated Scenario {drillCount} of {MAX_DRILLS}</p>
         </div>
         <Badge variant="outline" className="px-3 py-1 bg-muted/50 border-border text-xs uppercase tracking-wider">
-          Difficulty: {scenario.difficulty}
+          Difficulty: {drill.difficulty}
         </Badge>
       </div>
 
       <GlassCard glow="blue" className="p-8 space-y-6">
         <div className="space-y-4">
           <h3 className="text-xl font-bold font-display flex items-center gap-2">
-            <HelpCircle className="h-5 w-5 text-primary" /> {scenario.title}
+            <HelpCircle className="h-5 w-5 text-primary" /> {drill.title}
           </h3>
           <p className="text-foreground leading-relaxed bg-muted/20 p-4 rounded-lg border border-border/30">
-            {scenario.description}
+            {drill.description}
           </p>
         </div>
 
         <div className="grid gap-3">
-          {scenario.options.map((option, idx) => (
-            <button
-              key={idx}
-              disabled={selectedOption !== null}
-              onClick={() => handleOptionSelect(idx)}
-              className={`flex items-center gap-4 p-4 rounded-xl text-left transition-all border ${
-                selectedOption === idx
-                  ? option.score > 50 
-                    ? "bg-green-500/10 border-green-500/50" 
-                    : "bg-destructive/10 border-destructive/50"
-                  : selectedOption === null 
-                    ? "bg-muted/50 border-border hover:border-primary/50 hover:bg-muted" 
-                    : "bg-muted/20 border-border/50 opacity-50 cursor-not-allowed"
-              }`}
-            >
-              <div className={`p-2 rounded-lg ${selectedOption === idx ? "bg-background" : "bg-muted"}`}>
-                <option.icon className={`h-5 w-5 ${selectedOption === idx ? (option.score > 50 ? "text-green-400" : "text-destructive") : "text-muted-foreground"}`} />
-              </div>
-              <span className="font-medium flex-1">{option.label}</span>
-              {selectedOption === idx && (
-                <span className={`font-bold ${option.score > 0 ? 'text-green-400' : 'text-destructive'}`}>
-                  {option.score > 0 ? `+${option.score}` : option.score}
-                </span>
-              )}
-            </button>
-          ))}
+          {drill.options.map((option, idx) => {
+            // Assign a functional icon based on the score context
+            const Icon = option.score > 50 ? ShieldCheck : option.score > 0 ? Eye : AlertTriangle;
+            
+            return (
+              <button
+                key={idx}
+                disabled={selectedOption !== null}
+                onClick={() => handleOptionSelect(idx)}
+                className={`flex items-center gap-4 p-4 rounded-xl text-left transition-all border ${
+                  selectedOption === idx
+                    ? option.score > 50 
+                      ? "bg-green-500/10 border-green-500/50" 
+                      : "bg-destructive/10 border-destructive/50"
+                    : selectedOption === null 
+                      ? "bg-muted/50 border-border hover:border-primary/50 hover:bg-muted" 
+                      : "bg-muted/20 border-border/50 opacity-50 cursor-not-allowed"
+                }`}
+              >
+                <div className={`p-2 rounded-lg ${selectedOption === idx ? "bg-background" : "bg-muted"}`}>
+                  <Icon className={`h-5 w-5 ${selectedOption === idx ? (option.score > 50 ? "text-green-400" : "text-destructive") : "text-muted-foreground"}`} />
+                </div>
+                <span className="font-medium flex-1">{option.label}</span>
+                {selectedOption === idx && (
+                  <span className={`font-bold ${option.score > 0 ? 'text-green-400' : 'text-destructive'}`}>
+                    {option.score > 0 ? `+${option.score}` : option.score}
+                  </span>
+                )}
+              </button>
+            )
+          })}
         </div>
 
         {selectedOption !== null && (
           <div className={`p-4 rounded-lg animate-in fade-in slide-in-from-top-2 duration-500 ${
-            scenario.options[selectedOption].score > 50 ? 'bg-green-500/10 text-green-400' : 'bg-destructive/10 text-destructive'
+            drill.options[selectedOption].score > 50 ? 'bg-green-500/10 text-green-400' : 'bg-destructive/10 text-destructive'
           }`}>
             <p className="text-sm font-semibold mb-1">Feedback:</p>
-            <p className="text-xs text-foreground opacity-90">{scenario.options[selectedOption].feedback}</p>
+            <p className="text-xs text-foreground opacity-90">{drill.options[selectedOption].feedback}</p>
             <div className="mt-4 flex justify-end">
-              <GlowButton size="sm" onClick={nextScenario}>
-                {currentScenario === scenarios.length - 1 ? "Finish Drill" : "Next Scenario"} <ArrowRight className="h-4 w-4 ml-2" />
+              <GlowButton size="sm" onClick={nextScenario} disabled={loading}>
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 
+                  <>{drillCount === MAX_DRILLS ? "Finish Drill" : "Next Scenario"} <ArrowRight className="h-4 w-4 ml-2" /></>
+                }
               </GlowButton>
             </div>
           </div>

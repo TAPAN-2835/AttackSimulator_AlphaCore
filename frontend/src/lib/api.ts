@@ -174,6 +174,19 @@ export interface AIEmailGenerateResponse {
   cta_text: string;
 }
 
+export interface DrillOption {
+  label: string;
+  score: number;
+  feedback: string;
+}
+
+export interface DrillScenario {
+  title: string;
+  description: string;
+  difficulty: string;
+  options: DrillOption[];
+}
+
 export async function fetchCampaigns(): Promise<CampaignOut[]> {
   return apiFetch<CampaignOut[]>("/campaigns/");
 }
@@ -194,6 +207,10 @@ export async function generateAIEmail(payload: AIEmailGenerateRequest): Promise<
 
 export async function fetchDepartments(): Promise<string[]> {
   return apiFetch<string[]>("/admin/departments");
+}
+
+export async function fetchRandomDrill(): Promise<DrillScenario> {
+  return apiFetch<DrillScenario>("/drills/random");
 }
 
 // ── Analytics ────────────────────────────────────────────────────────────────
