@@ -9,7 +9,9 @@ window.addEventListener("load", () => {
   try {
     const isBreachApp =
       hostname.includes("localhost") ||
-      hostname.includes("127.0.0.1")
+      hostname.includes("127.0.0.1") ||
+      hostname.includes("onrender.com") ||
+      hostname.includes("vercel.app")
 
     if (isBreachApp && typeof window.localStorage !== "undefined") {
       const token = window.localStorage.getItem("breach_token")

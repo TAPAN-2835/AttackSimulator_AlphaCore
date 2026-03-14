@@ -1,16 +1,16 @@
 {
   "manifest_version": 3,
-  "name": "Employee Security Score",
-  "version": "1.0",
-  "description": "Security awareness extension with phishing detection",
+  "name": "Breach — Security Score",
+  "version": "2.0",
+  "description": "View your personal security risk score and get phishing alerts.",
 
   "permissions": [
-    "identity",
     "storage"
   ],
 
   "host_permissions": [
-    "http://127.0.0.1:8000/*"
+    "http://127.0.0.1:8000/*",
+    "https://attacksimulator-alphacore.onrender.com/*"
   ],
 
   "content_scripts": [
@@ -22,6 +22,7 @@
   ],
 
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_title": "Breach Security Score"
   }
 }

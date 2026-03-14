@@ -1,32 +1,82 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Security Score</title>
-<link rel="stylesheet" href="popup.css">
+  <meta charset="UTF-8" />
+  <title>Breach Security</title>
+  <link rel="stylesheet" href="popup.css" />
 </head>
-
 <body>
 
-<h2>Security Score</h2>
+  <!-- Login View -->
+  <div id="loginView">
+    <div class="brand">
+      <div class="shield">🛡</div>
+      <h1>Breach</h1>
+      <p class="tagline">Security Awareness</p>
+    </div>
 
-<div id="scoreCard">
-<p>Loading score...</p>
-</div>
+    <div id="loginError" class="error-msg hidden"></div>
 
-<h3>Quick Tips</h3>
+    <form id="loginForm">
+      <div class="field">
+        <label for="email">Email</label>
+        <input type="email" id="email" placeholder="you@company.com" required />
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="••••••••" required />
+      </div>
+      <button type="submit" id="loginBtn">Sign In</button>
+    </form>
+  </div>
 
-<ul class="tips">
-<li>Don't click links from unknown emails</li>
-<li>Verify sender before opening attachments</li>
-<li>Never enter credentials on suspicious websites</li>
-<li>Report phishing emails immediately</li>
-</ul>
+  <!-- Dashboard View -->
+  <div id="dashView" class="hidden">
+    <div class="top-bar">
+      <div class="user-info">
+        <span class="avatar" id="userAvatar">?</span>
+        <span id="userName">Loading...</span>
+      </div>
+      <button id="logoutBtn" title="Logout">⏏</button>
+    </div>
 
-<div class="footer">
-Stay Safe Online
-</div>
+    <div id="scoreCard">
+      <div class="score-label">Your Risk Score</div>
+      <div class="score-circle" id="scoreCircle">
+        <span id="scoreValue">--</span>
+      </div>
+      <div class="risk-badge" id="riskBadge">Loading...</div>
+    </div>
 
-<script src="popup.js"></script>
+    <div class="stats-grid">
+      <div class="stat">
+        <div class="stat-val" id="statClicks">--</div>
+        <div class="stat-label">Clicks</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="statCreds">--</div>
+        <div class="stat-label">Creds</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="statDownloads">--</div>
+        <div class="stat-label">Downloads</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="statReported">--</div>
+        <div class="stat-label">Reported</div>
+      </div>
+    </div>
 
+    <div class="tips-section">
+      <div class="tips-title">💡 Quick Tips</div>
+      <ul class="tips">
+        <li>Verify sender before opening attachments</li>
+        <li>Never enter credentials on suspicious sites</li>
+        <li>Always report suspicious emails immediately</li>
+      </ul>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
 </body>
 </html>
