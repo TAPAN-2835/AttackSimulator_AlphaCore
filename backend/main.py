@@ -17,6 +17,8 @@ from campaigns.routes import router as campaigns_router
 from simulation.routes import router as simulation_router
 from analytics.routes import router as analytics_router
 from admin.routes import router as admin_router
+from templates.routes import router as templates_router
+from ai_generation.routes import router as ai_router
 
 # Optional: RAG chatbot (may not have deps installed)
 try:
@@ -77,6 +79,8 @@ app.include_router(campaigns_router,  prefix="/campaigns",  tags=["Campaigns"])
 app.include_router(simulation_router, prefix="/sim",        tags=["Simulation"])
 app.include_router(analytics_router,  prefix="/analytics",  tags=["Analytics"])
 app.include_router(admin_router,      prefix="/admin",      tags=["Admin"])
+app.include_router(templates_router,  prefix="/templates",  tags=["Templates"])
+app.include_router(ai_router,         prefix="/ai",         tags=["AI Gen"])
 if _has_chatbot:
     app.include_router(chat_router,   prefix="/chat",       tags=["Chatbot"])
 

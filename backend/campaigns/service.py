@@ -9,7 +9,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from campaigns.models import Campaign, CampaignTarget, CampaignStatus, SimulationToken, AttackType
+from campaigns.models import Campaign, CampaignTarget, CampaignStatus, SimulationToken, AttackType, AIGeneratedCampaign
 from schemas.request_models import CampaignCreate
 from auth.models import User, UserRole
 from config import get_settings
@@ -44,12 +44,28 @@ async def create_campaign(
             attack_type=data.attack_type,
             target_group=data.target_group,
             template_name=template_name,
+            email_subject=getattr(data, "subject", None),
+            email_body=getattr(data, "body", None),
             scheduled_time=data.schedule_date,
             created_by=created_by,
             status=CampaignStatus.scheduled if data.schedule_date else CampaignStatus.draft,
         )
         db.add(campaign)
-        await db.flush()
+        await db.flush()  # Gets the campaign.id
+        
+        # Log AI generation metadata if provided
+        if getattr(data, "ai_model", None):
+            ai_campaign = AIGeneratedCampaign(
+                campaign_id=campaign.id,
+                model_used=data.ai_model,
+                attack_type=data.attack_type,
+                theme=getattr(data, "ai_theme", "Custom AI Prompt") or "Custom AI Prompt",
+                difficulty=getattr(data, "ai_difficulty", "medium") or "medium",
+                department=getattr(data, "target_group", "finance") or "any",
+            )
+            db.add(ai_campaign)
+            await db.flush()
+            
         await db.refresh(campaign)
         return campaign
     except Exception as e:
@@ -187,7 +203,9 @@ async def start_campaign(db: AsyncSession, campaign: Campaign) -> Campaign:
             targets=list(targets),
             tokens=list(tokens),
             campaign_id=campaign.id,
-            template_name=template_name
+            template_name=template_name,
+            custom_subject=getattr(campaign, "email_subject", None),
+            custom_body=getattr(campaign, "email_body", None),
         )
     except Exception as e:
         logger.error(f"Failed to dispatch emails: {str(e)}")

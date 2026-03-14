@@ -137,3 +137,17 @@ async def recent_events(
         o.campaign_name = campaigns.get(e.campaign_id) if e.campaign_id else None
         out.append(o)
     return out
+
+
+@router.get("/departments", response_model=list[str])
+async def list_departments(db: Annotated[AsyncSession, Depends(get_db)]):
+    """Return a sorted list of distinct departments that have at least one employee."""
+    result = await db.execute(
+        select(func.distinct(User.department)).where(
+            User.department != None,
+            User.role == UserRole.employee,
+        )
+    )
+    departments = sorted(row[0] for row in result.all() if row[0])
+    return departments
+

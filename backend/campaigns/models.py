@@ -35,6 +35,8 @@ class Campaign(Base):
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     target_group: Mapped[str | None] = mapped_column(String(120), nullable=True)
     template_name: Mapped[str] = mapped_column(String(50), nullable=False, default="password_reset")
+    email_subject: Mapped[str | None] = mapped_column(Text, nullable=True)
+    email_body: Mapped[str | None] = mapped_column(Text, nullable=True)
     scheduled_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[CampaignStatus] = mapped_column(
         SAEnum(CampaignStatus), default=CampaignStatus.draft, nullable=False
@@ -78,3 +80,19 @@ class SimulationToken(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     campaign: Mapped["Campaign"] = relationship(back_populates="tokens")
+
+
+class AIGeneratedCampaign(Base):
+    __tablename__ = "ai_generated_campaigns"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    campaign_id: Mapped[int | None] = mapped_column(ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=True)
+    model_used: Mapped[str] = mapped_column(String(50), nullable=False)
+    attack_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    theme: Mapped[str] = mapped_column(String(100), nullable=False)
+    difficulty: Mapped[str] = mapped_column(String(20), nullable=False)
+    department: Mapped[str] = mapped_column(String(100), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    # Optional relationship to Campaign if we want it bidirectional
+    # campaign: Mapped["Campaign"] = relationship()

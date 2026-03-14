@@ -43,7 +43,15 @@ class CampaignCreate(BaseModel):
     target_group: str | None = None
     template_id: int | None = None
     template_name: str | None = None
+    subject: str | None = None
+    body: str | None = None
     schedule_date: datetime | None = None
+    
+    # AI Metadata (Optional)
+    ai_model: str | None = None
+    ai_theme: str | None = None
+    ai_difficulty: str | None = None
+    ai_tone: str | None = None
 
     # Keep aliases or old fields if needed for transition, but here we replace for strictness
     @property
@@ -99,3 +107,18 @@ class EventOut(BaseModel):
     campaign_name: str | None = None
 
     model_config = {"from_attributes": True}
+
+
+class AIEmailGenerateRequest(BaseModel):
+    attack_type: str
+    theme: str
+    difficulty: str
+    department: str
+    tone: str
+    model: str
+
+
+class AIEmailGenerateResponse(BaseModel):
+    subject: str
+    body: str
+    cta_text: str
