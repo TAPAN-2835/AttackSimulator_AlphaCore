@@ -21,6 +21,11 @@ class RiskScore(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True, nullable=False, index=True)
     risk_score: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     risk_level: Mapped[RiskLevel] = mapped_column(SAEnum(RiskLevel), default=RiskLevel.LOW, nullable=False)
+    awareness_score: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    detection_accuracy: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    correct_detection_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    incorrect_detection_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    vulnerability_score: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     last_updated: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )

@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Target, Play, Users, Mail, BarChart3,
   ShieldAlert, ScrollText, Settings, Menu, X, Shield, KeyRound, GraduationCap,
-  User, ShieldCheck
+  User, ShieldCheck, MessageCircle
 } from "lucide-react";
 import { useState } from "react";
 import { useRole } from "@/App";
@@ -14,6 +14,7 @@ import ThemeToggle from "./ThemeToggle";
 const navItems = [
   { label: "Learning Portal", path: "/dashboard/learning-portal", icon: GraduationCap, role: "employee" },
   { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard, role: "admin" },
+  { label: "Chat", path: "/dashboard/chat", icon: MessageCircle },
   { label: "Analytics", path: "/dashboard/analytics", icon: BarChart3, role: "admin" },
   { label: "Risk Scoring", path: "/dashboard/risk-scoring", icon: ShieldAlert, role: "admin" },
   { label: "System Logs", path: "/dashboard/logs", icon: ScrollText, role: "admin" },

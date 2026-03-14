@@ -50,6 +50,9 @@ class CampaignCreate(BaseModel):
     subject: str | None = None
     body: str | None = None
     schedule_date: datetime | None = None
+    attack_indicators: list[str] = []
+
+    # Keep aliases or old fields if needed for transition, but here we replace for strictness
     
     # AI Metadata (Optional)
     ai_model: str | None = None
@@ -75,6 +78,7 @@ class CampaignOut(BaseModel):
     status: CampaignStatus
     created_by: int
     created_at: datetime
+    attack_indicators: list[str] | None = None
 
     model_config = {"from_attributes": True}
 
@@ -109,6 +113,8 @@ class EventOut(BaseModel):
     event_type: EventType
     ip_address: str | None
     timestamp: datetime
+    metadata_: dict | None = None
+    # Enriched fields joined in the route
     user_email: str | None = None
     campaign_name: str | None = None
     channel: str | None = None  # EMAIL, SMS, WHATSAPP from campaign

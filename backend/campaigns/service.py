@@ -103,6 +103,7 @@ async def create_campaign(
             scheduled_time=data.schedule_date,
             created_by=created_by,
             status=CampaignStatus.scheduled if data.schedule_date else CampaignStatus.draft,
+            attack_indicators=data.attack_indicators or [],
         )
         db.add(campaign)
         await db.flush()  # Gets the campaign.id

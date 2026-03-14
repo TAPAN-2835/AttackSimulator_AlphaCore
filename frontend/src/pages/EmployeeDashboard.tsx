@@ -1,5 +1,7 @@
 import { Shield, ShieldAlert, ShieldCheck, GraduationCap, ArrowRight, MousePointerClick, KeyRound, Bug, Info } from "lucide-react";
 import GlassCard from "@/components/GlassCard";
+import VirusTotalCheck from "@/components/VirusTotalCheck";
+import ReportPhishingForm from "@/components/ReportPhishingForm";
 import GlowButton from "@/components/GlowButton";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -69,13 +71,24 @@ const EmployeeDashboard = () => {
           </div>
         </GlassCard>
 
+        <div className="space-y-6">
+          {/* Report Phishing Action */}
+          <ReportPhishingForm campaignId={1} />
+          
+          {/* Check suspicious link (VirusTotal) */}
+          <VirusTotalCheck
+            title="Check a suspicious link"
+            glow="cyan"
+          />
+        </div>
+
         {/* Training Card */}
-        <GlassCard glow="purple" className="flex flex-col">
+        <GlassCard glow="purple" className="flex flex-col lg:col-span-3">
           <div className="flex items-center gap-2 text-secondary mb-4">
             <GraduationCap className="h-5 w-5" />
             <h3 className="font-bold font-display">Required Training</h3>
           </div>
-          <div className="space-y-4 flex-1">
+          <div className="grid md:grid-cols-3 gap-4 flex-1">
             {[
               { title: "Phishing 101", desc: "Spotting common red flags", prog: 0 },
               { title: "Credential Security", desc: "Protecting your corporate identity", prog: 0 },

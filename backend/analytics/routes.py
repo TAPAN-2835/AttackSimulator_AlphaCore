@@ -44,6 +44,8 @@ class UserRiskResponse(BaseModel):
     email: str
     risk_score: float
     risk_level: RiskLevel
+    correct_detection_count: int = 0
+    incorrect_detection_count: int = 0
     events: dict
 
 
@@ -162,6 +164,8 @@ async def user_risk(user_id: int, db: Annotated[AsyncSession, Depends(get_db)]):
         email=user.email,
         risk_score=rs.risk_score,
         risk_level=rs.risk_level,
+        correct_detection_count=rs.correct_detection_count,
+        incorrect_detection_count=rs.incorrect_detection_count,
         events=counts,
     )
 

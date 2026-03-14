@@ -120,6 +120,7 @@ export interface EventOut {
   event_type: string;
   ip_address: string | null;
   timestamp: string;
+  metadata_?: Record<string, any> | null;
   user_email: string | null;
   campaign_name: string | null;
 }
@@ -375,6 +376,66 @@ export async function updateEmployee(payload: {
 export async function removeEmployee(employee_id: number): Promise<void> {
   await apiFetch<unknown>(`/admin/users/${employee_id}/remove`, {
     method: "POST",
+  });
+}
+
+// ── Events (report phishing, VirusTotal) ──────────────────────────────────────
+
+export interface ReportPhishingPayload {
+  user_id: number;
+  campaign_id: number;
+  reason_selected: string;
+  reported_url?: string | null;
+}
+
+export interface VirusTotalResult {
+  malicious: number;
+  suspicious: number;
+  harmless: number;
+  undetected: number;
+  permalink: string | null;
+  error: string | null;
+  status?: string | null;
+}
+
+export interface ReportPhishingResponse {
+  success: boolean;
+  reason_matched: boolean;
+  awareness_score: number;
+  vulnerability_score: number;
+  detection_accuracy: number;
+  vt_checked?: boolean;
+  vt_result?: VirusTotalResult | null;
+}
+
+export async function reportPhishing(payload: ReportPhishingPayload): Promise<ReportPhishingResponse> {
+  return apiFetch<ReportPhishingResponse>("/events/report-phishing", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export interface CheckUrlPayload {
+  url: string;
+}
+
+export interface CheckUrlResponse {
+  checked: boolean;
+  result?: VirusTotalResult | null;
+  error?: string | null;
+}
+
+export async function checkUrlWithVirusTotal(payload: CheckUrlPayload): Promise<CheckUrlResponse> {
+  return apiFetch<CheckUrlResponse>("/events/check-url", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function checkFileUrlWithVirusTotal(payload: CheckUrlPayload): Promise<CheckUrlResponse> {
+  return apiFetch<CheckUrlResponse>("/events/check-file-url", {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }
 
