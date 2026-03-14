@@ -31,7 +31,11 @@ class Settings(BaseSettings):
     SMTP_FROM: str = "simulator@alphacore.io"
 
     # RAG Chatbot (Groq)
-    GROQ_API_KEY: str = ""
+    # AI Providers
+    GROQ_API_KEY: str | None = None
+    OPENAI_API_KEY: str | None = None
+    ANTHROPIC_API_KEY: str | None = None
+    GEMINI_API_KEY: str | None = None
 
     @property
     def origins_list(self) -> list[str]:

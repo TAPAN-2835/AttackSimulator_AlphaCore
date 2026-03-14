@@ -20,6 +20,7 @@ import ResponseDrills from "./pages/ResponseDrills";
 import EmployeeDashboard from "./pages/EmployeeDashboard";
 import TrainingPage from "./pages/TrainingPage";
 import NotFound from "./pages/NotFound";
+import CreateCampaign from "./pages/CreateCampaign";
 
 import { useState, createContext, useContext } from "react";
 
@@ -76,6 +77,7 @@ const App = () => {
               <Route path="/dashboard/logs" element={<DashboardPage requiredRole="admin"><SystemLogs /></DashboardPage>} />
               <Route path="/dashboard/user-groups" element={<DashboardPage requiredRole="admin"><UserGroups /></DashboardPage>} />
               <Route path="/dashboard/templates" element={<DashboardPage requiredRole="admin"><Templates /></DashboardPage>} />
+              <Route path="/dashboard/create-campaign" element={<DashboardPage requiredRole="admin"><CreateCampaign /></DashboardPage>} />
               
               {/* Shared/Utility Routes */}
               <Route path="/dashboard/password-test" element={<DashboardPage><PasswordTest /></DashboardPage>} />
