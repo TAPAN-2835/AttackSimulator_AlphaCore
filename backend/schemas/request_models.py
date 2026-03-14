@@ -2,6 +2,7 @@ from datetime import datetime
 from pydantic import BaseModel, EmailStr
 
 from auth.models import UserRole
+from employees.models import EmployeeStatus
 from campaigns.models import AttackType, CampaignStatus, ChannelType
 from events.models import EventType
 
@@ -113,6 +114,43 @@ class EventOut(BaseModel):
     channel: str | None = None  # EMAIL, SMS, WHATSAPP from campaign
 
     model_config = {"from_attributes": True}
+
+
+# ------------------------------------------------------------------
+# Employee & Group Management
+# ------------------------------------------------------------------
+
+
+class EmployeeOut(BaseModel):
+    employee_id: int
+    name: str
+    email: str
+    department: str | None = None
+    phone: str | None = None
+    status: EmployeeStatus
+
+
+class GroupOut(BaseModel):
+    group_id: int
+    group_name: str
+    description: str | None = None
+    members: int = 0
+    last_activity: datetime | None = None
+
+
+class GroupCreateRequest(BaseModel):
+    group_name: str
+    description: str | None = None
+    member_emails: list[str] | None = None
+
+
+class EmployeeUpdateRequest(BaseModel):
+    employee_id: int | None = None
+    email: EmailStr | None = None
+    name: str | None = None
+    phone: str | None = None
+    department: str | None = None
+    status: EmployeeStatus | None = None
 
 
 class AIEmailGenerateRequest(BaseModel):

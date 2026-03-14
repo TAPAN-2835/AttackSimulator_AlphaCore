@@ -10,6 +10,7 @@ import auth.models  # noqa: F401
 import campaigns.models  # noqa: F401
 import events.models  # noqa: F401
 import analytics.models  # noqa: F401
+import employees.models  # noqa: F401
 
 # Routers
 from auth.routes import router as auth_router
