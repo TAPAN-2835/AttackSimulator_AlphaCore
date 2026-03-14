@@ -56,54 +56,60 @@ async def _mark_target_flag(db: AsyncSession, campaign_id: int, email: str, fiel
 async def track_link_click(
     request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
-    user_id: int = Query(...),
-    campaign_id: int = Query(...),
+    user_id: int | None = Query(None),
+    campaign_id: int | None = Query(None),
+    target_id: int | None = Query(None),
 ):
     """
-    Requested: http://localhost:8000/track?user_id=<id>&campaign_id=<id>
-    Logs LINK_CLICK, then serves a fake login page.
+    Logs LINK_CLICK (if not already from /sim/{token}), then serves fake login page.
+    Use either user_id+campaign_id or target_id+campaign_id.
     """
-    # Verify campaign exists
+    if campaign_id is None:
+        raise HTTPException(status_code=400, detail="campaign_id required")
+
+    target = None
+    if target_id is not None:
+        t_res = await db.execute(
+            select(CampaignTarget).where(
+                CampaignTarget.id == target_id,
+                CampaignTarget.campaign_id == campaign_id,
+            )
+        )
+        target = t_res.scalar_one_or_none()
+    elif user_id is not None:
+        u_res = await db.execute(
+            select(CampaignTarget).where(
+                CampaignTarget.user_id == user_id,
+                CampaignTarget.campaign_id == campaign_id,
+            )
+        )
+        target = u_res.scalar_one_or_none()
+
+    if not target:
+        raise HTTPException(status_code=404, detail="Target not found")
+
     c_result = await db.execute(select(Campaign).where(Campaign.id == campaign_id))
     campaign = c_result.scalar_one_or_none()
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
 
-    # Fetch user/target email
-    u_res = await db.execute(select(CampaignTarget).where(
-        CampaignTarget.user_id == user_id, 
-        CampaignTarget.campaign_id == campaign_id
-    ))
-    target = u_res.scalar_one_or_none()
-    target_email = target.email if target else "unknown"
-
-    # Log the click
-    await log_event(
-        db=db,
-        event_type=EventType.LINK_CLICK,
-        request=request,
-        user_id=user_id,
-        campaign_id=campaign_id,
-        metadata={"email": target_email},
-    )
-    if target:
-        target.link_clicked = True
-        db.add(target)
-        await db.commit()
+    user_id_resolved = target.user_id
 
     if campaign.attack_type.value == "malware_download":
         from fastapi.responses import RedirectResponse
-        return RedirectResponse(url=f"{settings.SIM_BASE_URL}/sim/download?user_id={user_id}&campaign_id={campaign_id}")
+        return RedirectResponse(
+            url=f"{settings.SIM_BASE_URL}/sim/download?target_id={target.id}&campaign_id={campaign_id}"
+        )
 
     action_url = f"{settings.SIM_BASE_URL}/sim/credential"
-    
-    # Alternate template based on basic id heuristic
-    if user_id % 2 == 0:
-        html = microsoft_login_page(user_id, campaign_id, action_url)
+    uid = user_id_resolved if user_id_resolved is not None else target.id
+    if uid % 2 == 0:
+        html = microsoft_login_page(uid, campaign_id, action_url, target_id=target.id)
     else:
-        html = corporate_login_page(user_id, campaign_id, action_url)
+        html = corporate_login_page(uid, campaign_id, action_url, target_id=target.id)
 
     return HTMLResponse(content=html)
+
 
 class CredentialSubmit(BaseModel):
     user_id: int
@@ -116,13 +122,29 @@ async def credential_submit(
     request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    # Retrieve form data manually because it's a standard HTML form submission, not JSON
     form = await request.form()
-    user_id = int(form.get("user_id"))
     campaign_id = int(form.get("campaign_id"))
     username = form.get("username", "")
+    target_id_raw = form.get("target_id")
+    user_id_raw = form.get("user_id")
+    if target_id_raw:
+        target_id = int(target_id_raw)
+        t_res = await db.execute(select(CampaignTarget).where(
+            CampaignTarget.id == target_id,
+            CampaignTarget.campaign_id == campaign_id,
+        ))
+        target = t_res.scalar_one_or_none()
+    else:
+        user_id = int(user_id_raw)
+        u_res = await db.execute(select(CampaignTarget).where(
+            CampaignTarget.user_id == user_id,
+            CampaignTarget.campaign_id == campaign_id,
+        ))
+        target = u_res.scalar_one_or_none()
+    if not target:
+        raise HTTPException(status_code=404, detail="Target not found")
+    user_id = target.user_id
 
-    # Log — password is intentionally excluded
     await log_event(
         db=db,
         event_type=EventType.CREDENTIAL_ATTEMPT,
@@ -131,27 +153,20 @@ async def credential_submit(
         campaign_id=campaign_id,
         metadata={"username_provided": username, "password_stored": False},
     )
-    
-    # Update target stats
-    u_res = await db.execute(select(CampaignTarget).where(
-        CampaignTarget.user_id == user_id, 
-        CampaignTarget.campaign_id == campaign_id
-    ))
-    target = u_res.scalar_one_or_none()
-    if target:
-        target.credential_attempt = True
-        db.add(target)
+    target.credential_attempt = True
+    db.add(target)
 
-    # Trigger async risk score update
     from analytics.risk_engine import compute_and_save_risk
-    await compute_and_save_risk(db, user_id)
+    if user_id is not None:
+        await compute_and_save_risk(db, user_id)
     await db.commit()
-
-    # Show premium awareness training page in frontend
+    c_res = await db.execute(select(Campaign).where(Campaign.id == campaign_id))
+    campaign = c_res.scalar_one_or_none()
+    campaign_name = campaign.name if campaign else "Simulation"
     from fastapi.responses import RedirectResponse
-    frontend_url = "http://localhost:5173" # Default Vite port
+    frontend_url = "http://localhost:5173"
     return RedirectResponse(
-        url=f"{frontend_url}/training?campaign={campaign.name}&user_id={user_id}&campaign_id={campaign_id}",
+        url=f"{frontend_url}/training?campaign={campaign_name}&user_id={user_id or ''}&campaign_id={campaign_id}",
         status_code=303
     )
 
@@ -160,36 +175,51 @@ async def credential_submit(
 async def malware_download(
     request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
-    user_id: int = Query(...),
-    campaign_id: int = Query(...),
+    user_id: int | None = Query(None),
+    campaign_id: int | None = Query(None),
+    target_id: int | None = Query(None),
 ):
     """
     Simulates a malware download. Returns a harmless ZIP with a drill notice.
+    Use either user_id+campaign_id or target_id+campaign_id.
     """
+    if not campaign_id:
+        raise HTTPException(status_code=400, detail="campaign_id required")
+    if target_id is not None:
+        t_res = await db.execute(select(CampaignTarget).where(
+            CampaignTarget.id == target_id,
+            CampaignTarget.campaign_id == campaign_id,
+        ))
+        target = t_res.scalar_one_or_none()
+    else:
+        if user_id is None:
+            raise HTTPException(status_code=400, detail="user_id or target_id required")
+        u_res = await db.execute(select(CampaignTarget).where(
+            CampaignTarget.user_id == user_id,
+            CampaignTarget.campaign_id == campaign_id,
+        ))
+        target = u_res.scalar_one_or_none()
+    if not target:
+        raise HTTPException(status_code=404, detail="Target not found")
+
     await log_event(
         db=db,
         event_type=EventType.FILE_DOWNLOAD,
         request=request,
-        user_id=user_id,
+        user_id=target.user_id,
         campaign_id=campaign_id,
         metadata={"source": "simulated_malware_file"}
     )
-    
-    u_res = await db.execute(select(CampaignTarget).where(
-        CampaignTarget.user_id == user_id, 
-        CampaignTarget.campaign_id == campaign_id
-    ))
-    target = u_res.scalar_one_or_none()
-    if target:
-        target.file_download = True
-        db.add(target)
-        
+    target.file_download = True
+    db.add(target)
+
     from analytics.risk_engine import compute_and_save_risk
-    await compute_and_save_risk(db, user_id)
+    if target.user_id is not None:
+        await compute_and_save_risk(db, target.user_id)
     await db.commit()
 
     file_bytes, filename = generate_dummy_file()
-    
+
     # MIME types handling
     media_type = "application/octet-stream"
     if filename.endswith(".zip"):
@@ -200,6 +230,64 @@ async def malware_download(
         media_type=media_type,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+
+
+
+@router.get("/report")
+async def report_phish(
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user_id: int = Query(...),
+    campaign_id: int = Query(...),
+):
+    """
+    Endpoint for users to report the phishing email.
+    Logs an EMAIL_REPORTED event and updates the target status.
+    """
+    await log_event(
+        db=db,
+        event_type=EventType.EMAIL_REPORTED,
+        request=request,
+        user_id=user_id,
+        campaign_id=campaign_id,
+        metadata={"source": "user_report_button"},
+    )
+
+    u_res = await db.execute(
+        select(CampaignTarget).where(
+            CampaignTarget.user_id == user_id,
+            CampaignTarget.campaign_id == campaign_id,
+        )
+    )
+    target = u_res.scalar_one_or_none()
+    if target:
+        target.reported = True
+        db.add(target)
+
+    from analytics.risk_engine import compute_and_save_risk
+    await compute_and_save_risk(db, user_id)
+    await db.commit()
+
+    return HTMLResponse(content="""
+        <html>
+            <head>
+                <style>
+                    body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0fdf4; color: #166534; text-align: center; }
+                    .card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: 1px solid #bbf7d0; }
+                    h1 { margin-top: 0; }
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    <h1>✅ Successfully Reported</h1>
+                    <p>Thank you for helping keep our organization secure.</p>
+                    <p>Our security team has been notified of this suspicious email.</p>
+                </div>
+            </body>
+        </html>
+    """)
 
 
 # ── Tracking Pixel — Email Open ───────────────────────────────────────────────
@@ -261,3 +349,40 @@ async def track_email_open(
             "Pragma": "no-cache",
         },
     )
+
+
+@router.get("/{token}", response_class=HTMLResponse)
+async def sim_token_redirect(
+    request: Request,
+    token: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Unique tracking link: /sim/{token}. Validates token, logs LINK_CLICK, redirects to phishing page.
+    """
+    sim_token = await _get_valid_token(token, db)
+    target_result = await db.execute(
+        select(CampaignTarget).where(
+            CampaignTarget.campaign_id == sim_token.campaign_id,
+            CampaignTarget.email == sim_token.target_email,
+        )
+    )
+    target = target_result.scalar_one_or_none()
+    if not target:
+        raise HTTPException(status_code=404, detail="Target not found")
+
+    await log_event(
+        db=db,
+        event_type=EventType.LINK_CLICK,
+        request=request,
+        user_id=sim_token.user_id,
+        campaign_id=sim_token.campaign_id,
+        metadata={"email": sim_token.target_email},
+    )
+    target.link_clicked = True
+    db.add(target)
+    await db.commit()
+
+    from fastapi.responses import RedirectResponse
+    redirect_url = f"{settings.SIM_BASE_URL}/sim/track?target_id={target.id}&campaign_id={sim_token.campaign_id}"
+    return RedirectResponse(url=redirect_url, status_code=302)

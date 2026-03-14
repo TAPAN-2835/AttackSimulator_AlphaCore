@@ -1,66 +1,125 @@
 import asyncio
 import logging
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth.models import User, UserRole
+from campaigns.models import MessageTemplate, ChannelType
 from utils.security import hash_password
 
 logger = logging.getLogger(__name__)
 
-async def initialize_database(db: AsyncSession):
-    """
-    Auto-creates the default admin and 4 departmental employees if they do not exist.
-    """
-    
-    # Check if admin already exists
-    result = await db.execute(select(User).where(User.email == "anishpatel4y@gmail.com"))
-    admin = result.scalar_one_or_none()
-    
-    if admin:
-        logger.info("Database already initialized. Found admin user.")
+
+async def seed_message_templates(db: AsyncSession) -> None:
+    """Seed default SMS and WhatsApp message templates if none exist."""
+    r = await db.execute(select(MessageTemplate).limit(1))
+    if r.scalar_one_or_none() is not None:
         return
 
-    logger.info("Initializing database with default users...")
-
-    default_users = [
-        User(
-            email="anishpatel4y@gmail.com",
-            name="Anish Patel",
-            password_hash=hash_password("anish123"),
-            role=UserRole.admin,
-            department="security"
+    defaults = [
+        MessageTemplate(
+            channel_type=ChannelType.SMS,
+            template_name="Urgent verification",
+            message_body="Urgent: Your company account requires verification. Click here: {{link}}",
         ),
-        User(
-            email="mrpatel2835@gmail.com",
-            name="Tapan Patel",
-            password_hash=hash_password("tapu123"),
-            role=UserRole.employee,
-            department="finance"
-        ),
-        User(
-            email="tejsus13@gmail.com",
-            name="Tejas",
-            password_hash=hash_password("tejas123"),
-            role=UserRole.employee,
-            department="engineering"
-        ),
-        User(
-            email="preritashukla@gmail.com",
-            name="Prerita",
-            password_hash=hash_password("prerita123"),
-            role=UserRole.employee,
-            department="hr"
-        ),
-        User(
-            email="employee4@gmail.com",
-            name="Employee Four",
-            password_hash=hash_password("password123"),
-            role=UserRole.employee,
-            department="marketing"
+        MessageTemplate(
+            channel_type=ChannelType.WHATSAPP,
+            template_name="Security alert",
+            message_body=(
+                "Security Alert ⚠️\n"
+                "Your company login attempt requires verification.\n\n"
+                "Verify now:\n{{link}}"
+            ),
         ),
     ]
+    db.add_all(defaults)
+    logger.info("Seeded default message templates.")
 
-    db.add_all(default_users)
+
+async def initialize_database(db: AsyncSession):
+    """
+    Auto-creates or updates default users and message templates.
+    """
+    logger.info("Synchronizing database with default users...")
+
+    default_users_data = [
+        {
+            "email": "anishpatel4y@gmail.com",
+            "name": "Anish Patel",
+            "password": "anish123",
+            "role": UserRole.admin,
+            "department": "security",
+            "phone_number": None,
+        },
+        {
+            "email": "mrpatel2835@gmail.com",
+            "name": "Tapan Patel",
+            "phone_number": "+919106527737",
+            "password": "tapu123",
+            "role": UserRole.employee,
+            "department": "finance",
+        },
+        {
+            "email": "tejsus13@gmail.com",
+            "name": "Tejas",
+            "phone_number": "+919662458326",
+            "password": "tejas123",
+            "role": UserRole.employee,
+            "department": "engineering",
+        },
+        {
+            "email": "preritashukla@gmail.com",
+            "name": "Prerita",
+            "phone_number": "+919825990612",
+            "password": "prerita123",
+            "role": UserRole.employee,
+            "department": "hr",
+        },
+        {
+            "email": "anish.marketing@gmail.com",
+            "name": "Anish",
+            "phone_number": "+919726396980",
+            "password": "anish123",
+            "role": UserRole.employee,
+            "department": "marketing",
+        },
+        {
+            "email": "grishmamakwana1@gmail.com",
+            "name": "Grishma",
+            "phone_number": "+919601163573",
+            "password": "grish123",
+            "role": UserRole.employee,
+            "department": "marketing",
+        },
+    ]
+
+    for user_data in default_users_data:
+        result = await db.execute(
+            select(User).where(User.email == user_data["email"])
+        )
+        user = result.scalar_one_or_none()
+
+        if user:
+            user.name = user_data["name"]
+            user.phone_number = user_data["phone_number"]
+            user.department = user_data["department"]
+            user.role = user_data["role"]
+            user.password_hash = hash_password(user_data["password"])
+            logger.info(f"Updated user: {user_data['email']}")
+        else:
+            new_user = User(
+                email=user_data["email"],
+                name=user_data["name"],
+                phone_number=user_data["phone_number"],
+                password_hash=hash_password(user_data["password"]),
+                role=user_data["role"],
+                department=user_data["department"],
+            )
+            db.add(new_user)
+            logger.info(f"Created user: {user_data['email']}")
+
+    await db.flush()
+    await seed_message_templates(db)
     await db.commit()
-    logger.info("Successfully inserted 5 default users.")
+    logger.info("Database synchronization complete.")

@@ -24,7 +24,8 @@ _BASE_CSS = """
 """
 
 
-def microsoft_login_page(user_id: int, campaign_id: int, action_url: str) -> str:
+def microsoft_login_page(user_id: int, campaign_id: int, action_url: str, target_id: int | None = None) -> str:
+    extra = f'<input type="hidden" name="target_id" value="{target_id}">' if target_id else ""
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -45,18 +46,23 @@ def microsoft_login_page(user_id: int, campaign_id: int, action_url: str) -> str
     <form method="POST" action="{action_url}">
       <input type="hidden" name="user_id" value="{user_id}">
       <input type="hidden" name="campaign_id" value="{campaign_id}">
+      {extra}
       <label>Email or phone</label>
       <input type="text" name="username" placeholder="user@company.com" required>
       <label>Password</label>
       <input type="password" name="password" placeholder="Password" required>
       <button type="submit">Next</button>
     </form>
+    <div style="margin-top: 24px; text-align: center; border-top: 1px solid #eee; pt-4">
+      <a href="/sim/report?user_id={user_id}&campaign_id={campaign_id}" style="color: #6b7280; font-size: 12px; text-decoration: none;">Report suspicious email</a>
+    </div>
   </div>
 </body>
 </html>"""
 
 
-def corporate_login_page(user_id: int, campaign_id: int, action_url: str) -> str:
+def corporate_login_page(user_id: int, campaign_id: int, action_url: str, target_id: int | None = None) -> str:
+    extra = f'<input type="hidden" name="target_id" value="{target_id}">' if target_id else ""
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -73,12 +79,16 @@ def corporate_login_page(user_id: int, campaign_id: int, action_url: str) -> str
     <form method="POST" action="{action_url}">
       <input type="hidden" name="user_id" value="{user_id}">
       <input type="hidden" name="campaign_id" value="{campaign_id}">
+      {extra}
       <label>Corporate Email</label>
       <input type="email" name="username" placeholder="you@company.com" required>
       <label>Password</label>
       <input type="password" name="password" placeholder="Password" required>
       <button type="submit">Sign In</button>
     </form>
+    <div style="margin-top: 24px; text-align: center; border-top: 1px solid #eee; pt-4">
+      <a href="/sim/report?user_id={user_id}&campaign_id={campaign_id}" style="color: #6b7280; font-size: 12px; text-decoration: none;">Report suspicious email</a>
+    </div>
   </div>
 </body>
 </html>"""

@@ -5,32 +5,56 @@ import StatCard from "@/components/StatCard";
 import LiveFeed from "@/components/LiveFeed";
 import GlassCard from "@/components/GlassCard";
 import {
-  fetchAdminDashboard, fetchAnalyticsDashboard, fetchRecentEvents, fetchUsers,
-  type DashboardOverview, type AnalyticsOverview, type EventOut, type UserWithRisk,
+  fetchAdminDashboard, fetchAnalyticsDashboard, fetchRecentEvents, fetchUsers, fetchCampaignTrend,
+  type DashboardOverview, type AnalyticsOverview, type EventOut, type UserWithRisk, type TrendPoint
 } from "@/lib/api";
 
 const Dashboard = () => {
   const [overview, setOverview] = useState<DashboardOverview | null>(null);
   const [analytics, setAnalytics] = useState<AnalyticsOverview | null>(null);
   const [highRiskUsers, setHighRiskUsers] = useState<UserWithRisk[]>([]);
+  const [events, setEvents] = useState<EventOut[]>([]);
+  const [trends, setTrends] = useState<TrendPoint[]>([]);
+
+  const refreshData = async () => {
+    try {
+      const [ov, an, evs, urs, tr] = await Promise.all([
+        fetchAdminDashboard(),
+        fetchAnalyticsDashboard(),
+        fetchRecentEvents(15),
+        fetchUsers(),
+        fetchCampaignTrend()
+      ]);
+      setOverview(ov);
+      setAnalytics(an);
+      setEvents(evs);
+      setTrends(tr);
+      
+      const sorted = urs
+        .filter((u) => u.risk_score !== null)
+        .sort((a, b) => (b.risk_score ?? 0) - (a.risk_score ?? 0))
+        .slice(0, 3);
+      setHighRiskUsers(sorted);
+    } catch (err) {
+      console.error("Dashboard refresh failed:", err);
+    }
+  };
 
   useEffect(() => {
-    fetchAdminDashboard().then(setOverview).catch(() => {});
-    fetchAnalyticsDashboard().then(setAnalytics).catch(() => {});
-    fetchUsers()
-      .then((users) => {
-        const sorted = users
-          .filter((u) => u.risk_score !== null)
-          .sort((a, b) => (b.risk_score ?? 0) - (a.risk_score ?? 0))
-          .slice(0, 3);
-        setHighRiskUsers(sorted);
-      })
-      .catch(() => {});
+    refreshData();
+    const interval = setInterval(refreshData, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const deptData = analytics?.high_risk_departments?.length
     ? analytics.high_risk_departments.map((d) => ({ dept: d.name, risk: d.score }))
     : [];
+
+  // Map campaign trends for the click rate chart
+  const trendData = trends.map(t => ({
+    name: t.campaign,
+    rate: t.total_events > 0 ? Math.round((t.clicks / t.total_events) * 100) : 0
+  }));
 
   return (
     <div className="space-y-6">
@@ -52,7 +76,7 @@ const Dashboard = () => {
         <div className="glass rounded-lg p-5">
           <h3 className="text-sm font-semibold font-display mb-4">Phishing Click Rate Trend</h3>
           <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={[]}>
+            <AreaChart data={trendData}>
               <defs>
                 <linearGradient id="blueGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="hsl(217,100%,60%)" stopOpacity={0.4} />
@@ -60,7 +84,7 @@ const Dashboard = () => {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-              <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
+              <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(val) => val.length > 10 ? val.substring(0, 10) + '...' : val} />
               <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
               <Tooltip contentStyle={{ 
                 background: "hsl(var(--card))", 
@@ -96,7 +120,7 @@ const Dashboard = () => {
 
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <LiveFeed />
+          <LiveFeed events={events} />
         </div>
         <div className="space-y-6">
           <GlassCard glow="blue" className="p-5">
