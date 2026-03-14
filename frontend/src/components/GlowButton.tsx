@@ -9,9 +9,9 @@ const GlowButton = ({ className, glowColor = "blue", children, ...props }: GlowB
   <Button
     className={cn(
       "relative font-semibold transition-all duration-300",
-      glowColor === "blue" && "bg-primary hover:bg-primary/90 hover:glow-blue text-primary-foreground",
-      glowColor === "purple" && "bg-secondary hover:bg-secondary/90 hover:glow-purple text-secondary-foreground",
-      glowColor === "cyan" && "bg-accent hover:bg-accent/90 hover:glow-cyan text-accent-foreground",
+      glowColor === "blue" && "bg-primary hover:bg-primary/95 hover:glow-blue text-primary-foreground shadow-sm",
+      glowColor === "purple" && "bg-secondary hover:bg-secondary/95 hover:glow-purple text-secondary-foreground shadow-sm",
+      glowColor === "cyan" && "bg-accent hover:bg-accent/95 hover:glow-cyan text-accent-foreground shadow-sm",
       className
     )}
     {...props}

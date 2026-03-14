@@ -16,12 +16,12 @@ const attackTypeMap: Record<string, string> = {
 };
 
 const statusColor: Record<string, string> = {
-  Active: "bg-green-500/20 text-green-400 border-green-500/30",
-  running: "bg-green-500/20 text-green-400 border-green-500/30",
-  Completed: "bg-primary/20 text-primary border-primary/30",
-  completed: "bg-primary/20 text-primary border-primary/30",
-  Scheduled: "bg-secondary/20 text-secondary border-secondary/30",
-  scheduled: "bg-secondary/20 text-secondary border-secondary/30",
+  Active: "bg-green-100 text-green-700 border-green-200",
+  running: "bg-green-100 text-green-700 border-green-200",
+  Completed: "bg-primary/10 text-primary border-primary/20",
+  completed: "bg-primary/10 text-primary border-primary/20",
+  Scheduled: "bg-blue-100 text-blue-700 border-blue-200",
+  scheduled: "bg-blue-100 text-blue-700 border-blue-200",
   Draft: "bg-muted text-muted-foreground border-border",
   draft: "bg-muted text-muted-foreground border-border",
 };

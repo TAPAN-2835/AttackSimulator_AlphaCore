@@ -16,9 +16,9 @@ const initialGroups = [
 ];
 
 const riskBadge: Record<string, string> = {
-  Low: "bg-green-500/20 text-green-400 border-green-500/30",
-  Medium: "bg-secondary/20 text-secondary border-secondary/30",
-  High: "bg-destructive/20 text-destructive border-destructive/30",
+  Low: "bg-green-100 text-green-700 border-green-200",
+  Medium: "bg-amber-100 text-amber-700 border-amber-200",
+  High: "bg-red-100 text-red-700 border-red-200",
 };
 
 const UserGroups = () => {
@@ -56,7 +56,7 @@ const UserGroups = () => {
 
       <div className="grid md:grid-cols-3 gap-6">
         <GlassCard className="flex items-center gap-4 py-4" glow="blue">
-          <div className="p-3 rounded-xl bg-primary/10 text-primary">
+          <div className="p-3 rounded-xl bg-blue-100 text-blue-600">
             <Users className="h-6 w-6" />
           </div>
           <div>
@@ -65,7 +65,7 @@ const UserGroups = () => {
           </div>
         </GlassCard>
         <GlassCard className="flex items-center gap-4 py-4" glow="purple">
-          <div className="p-3 rounded-xl bg-secondary/10 text-secondary">
+          <div className="p-3 rounded-xl bg-violet-100 text-violet-600">
             <FileSpreadsheet className="h-6 w-6" />
           </div>
           <div>
@@ -74,7 +74,7 @@ const UserGroups = () => {
           </div>
         </GlassCard>
         <GlassCard className="flex items-center gap-4 py-4" glow="cyan">
-          <div className="p-3 rounded-xl bg-accent/10 text-accent">
+          <div className="p-3 rounded-xl bg-cyan-100 text-cyan-600">
             <FileJson className="h-6 w-6" />
           </div>
           <div>
