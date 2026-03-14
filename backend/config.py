@@ -7,6 +7,7 @@ class Settings(BaseSettings):
 
     # App
     APP_NAME: str = "Breach"
+    BASE_URL: str = "http://localhost:8000"  # Deployed backend URL
     SECRET_KEY: str = "CHANGE_ME_IN_PRODUCTION"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
@@ -18,6 +19,9 @@ class Settings(BaseSettings):
 
     # Simulation
     SIM_BASE_URL: str = "http://localhost:8000"
+    @property
+    def phishing_base_url(self) -> str:
+        return self.BASE_URL.rstrip("/")
     TOKEN_EXPIRY_HOURS: int = 72
     SIMULATION_MODE: bool = True  # When True: log messages only, no real SMS/WhatsApp sent
 

@@ -315,7 +315,7 @@ async def start_campaign(db: AsyncSession, campaign: Campaign) -> Campaign:
                 if not phone:
                     logger.warning(f"Skipping SMS for target {target.email}: no phone_number")
                     continue
-                sim_link = f"{settings.SIM_BASE_URL}/sim/{token.token}"
+                sim_link = generate_phishing_link(target.user_id, campaign.id, token.token)
                 msg = body.replace("{{link}}", sim_link)
                 if send_sms(phone, msg):
                     target.sms_sent = True
@@ -338,7 +338,7 @@ async def start_campaign(db: AsyncSession, campaign: Campaign) -> Campaign:
                 if not phone:
                     logger.warning(f"Skipping WhatsApp for target {target.email}: no phone_number")
                     continue
-                sim_link = f"{settings.SIM_BASE_URL}/sim/{token.token}"
+                sim_link = generate_phishing_link(target.user_id, campaign.id, token.token)
                 msg = body.replace("{{link}}", sim_link)
                 if send_whatsapp(phone, msg):
                     target.whatsapp_sent = True
@@ -454,3 +454,17 @@ async def generate_whatsapp_link(
     )
     
     return whatsapp_url
+
+
+def generate_phishing_link(user_id: int | None, campaign_id: int, token: str) -> str:
+    """uid=<user_id>&cid=<campaign_id>&token=<token>"""
+    base = settings.phishing_base_url
+    uid = user_id if user_id else "0"
+    return f"{base}/phish/login?uid={uid}&cid={campaign_id}&token={token}"
+
+
+def generate_tracking_pixel(user_id: int | None, campaign_id: int) -> str:
+    """<img src='BASE_URL/email/open?uid=<user_id>&cid=<campaign_id>' ...>"""
+    base = settings.phishing_base_url
+    uid = user_id if user_id else "0"
+    return f"{base}/email/open?uid={uid}&cid={campaign_id}"

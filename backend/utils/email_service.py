@@ -73,13 +73,11 @@ def send_phishing_emails(
             server.login(smtp_user, smtp_pass)
 
             for target, token in zip(targets, tokens):
-                # Unique tracking link: /sim/{token} — validates token, logs LINK_CLICK, then redirects
-                sim_link = f"{settings.SIM_BASE_URL}/sim/{token.token}"
+                from campaigns.service import generate_phishing_link, generate_tracking_pixel
+                
                 target_id = getattr(target, 'user_id', None) or getattr(target, 'id', None)
-                tracking_pixel_url = (
-                    f"{settings.SIM_BASE_URL}/sim/open"
-                    f"?user_id={target_id}&campaign_id={campaign_id}"
-                )
+                sim_link = generate_phishing_link(target_id, campaign_id, token.token)
+                tracking_pixel_url = generate_tracking_pixel(target_id, campaign_id)
 
                 target_name = getattr(target, 'name', None) or "Employee"
 

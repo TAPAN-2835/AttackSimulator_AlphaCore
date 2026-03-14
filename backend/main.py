@@ -22,6 +22,7 @@ from admin.routes import router as admin_router
 from templates.routes import router as templates_router
 from ai_generation.routes import router as ai_router
 from drills.routes import router as drills_router
+from simulation.tracking import router as tracking_router
 from events.ws_manager import get_broadcaster, set_broadcaster
 
 # Optional: RAG chatbot (may not have deps installed)
@@ -91,6 +92,8 @@ app.include_router(admin_router,      prefix="/admin",      tags=["Admin"])
 app.include_router(templates_router,  prefix="/templates",  tags=["Templates"])
 app.include_router(ai_router,         prefix="/ai",         tags=["AI Gen"])
 app.include_router(drills_router,     prefix="/drills",     tags=["Drills"])
+app.include_router(tracking_router,   prefix="/phish",      tags=["Phishing Tracking"])
+app.include_router(tracking_router,   prefix="/email",      tags=["Email Tracking"])
 if _has_chatbot:
     app.include_router(chat_router,   prefix="/chat",       tags=["Chatbot"])
 
