@@ -10,6 +10,8 @@ from database import Base
 
 class EventType(str, enum.Enum):
     EMAIL_SENT = "EMAIL_SENT"
+    SMS_SENT = "SMS_SENT"
+    WHATSAPP_SENT = "WHATSAPP_SENT"
     EMAIL_OPEN = "EMAIL_OPEN"
     LINK_CLICK = "LINK_CLICK"
     CREDENTIAL_ATTEMPT = "CREDENTIAL_ATTEMPT"

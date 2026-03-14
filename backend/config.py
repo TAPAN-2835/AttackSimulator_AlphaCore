@@ -19,6 +19,13 @@ class Settings(BaseSettings):
     # Simulation
     SIM_BASE_URL: str = "http://localhost:8000"
     TOKEN_EXPIRY_HOURS: int = 72
+    SIMULATION_MODE: bool = True  # When True: log messages only, no real SMS/WhatsApp sent
+
+    # Twilio (optional — for real SMS/WhatsApp when SIMULATION_MODE=False)
+    TWILIO_ACCOUNT_SID: str = ""
+    TWILIO_AUTH_TOKEN: str = ""
+    TWILIO_PHONE_NUMBER: str = ""
+    TWILIO_WHATSAPP_FROM: str = "whatsapp:+14155238886"  # Sandbox
 
     # CORS
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173,http://localhost:8080"
@@ -31,7 +38,11 @@ class Settings(BaseSettings):
     SMTP_FROM: str = "simulator@alphacore.io"
 
     # RAG Chatbot (Groq)
-    GROQ_API_KEY: str = ""
+    # AI Providers
+    GROQ_API_KEY: str | None = None
+    OPENAI_API_KEY: str | None = None
+    ANTHROPIC_API_KEY: str | None = None
+    GEMINI_API_KEY: str | None = None
 
     @property
     def origins_list(self) -> list[str]:

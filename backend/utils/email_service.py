@@ -13,11 +13,16 @@ def send_phishing_emails(
     targets: list[CampaignTarget],
     tokens: list[SimulationToken],
     campaign_id: int,
-    template_name: str = "password_reset"
+    template_name: str = "password_reset",
+    custom_subject: str | None = None,
+    custom_body: str | None = None,
 ) -> None:
     """
     Sends real emails via SMTP using Python's built-in smtplib.
     Requires SMTP environment variables to be set in .env.
+
+    If custom_subject / custom_body are provided (from template-based campaign creation),
+    they are used directly instead of the Jinja HTML template files.
     """
     smtp_server = getattr(settings, "SMTP_SERVER", "")
     smtp_port = int(getattr(settings, "SMTP_PORT", "587"))
@@ -33,27 +38,32 @@ def send_phishing_emails(
         )
         return
 
-    if not template_name:
-        logger.error("[SMTP EMAIL FAILED] send_phishing_emails called without template_name")
-        return
+    # ── Determine rendering mode ─────────────────────────────────────────────
+    use_custom_body = bool(custom_body)
 
-    # Clean extension if provided to avoid duplicate .html.html
-    if template_name.endswith(".html"):
-        template_name = template_name[:-5]
+    if not use_custom_body:
+        # Fall back to Jinja HTML template files
+        if not template_name:
+            logger.error("[SMTP EMAIL FAILED] send_phishing_emails called without template_name")
+            return
 
-    from jinja2 import Environment, FileSystemLoader
+        # Clean extension if provided to avoid duplicate .html.html
+        if template_name.endswith(".html"):
+            template_name = template_name[:-5]
 
-    # Load HTML template using Jinja2 with the correct template directory
-    template_dir = os.path.join(os.path.dirname(__file__), "..", "email_templates")
-    template_dir = os.path.abspath(template_dir)
-    env = Environment(loader=FileSystemLoader(template_dir))
+        from jinja2 import Environment, FileSystemLoader
 
-    try:
-        template = env.get_template(f"{template_name}.html")
-        logger.info(f"Loaded email template: {template_name}.html")
-    except Exception as e:
-        logger.error(f"[SMTP EMAIL FAILED] Could not load template '{template_name}': {e}")
-        return  # Do NOT silently replace with a different template
+        # Load HTML template using Jinja2 with the correct template directory
+        template_dir = os.path.join(os.path.dirname(__file__), "..", "email_templates")
+        template_dir = os.path.abspath(template_dir)
+        env = Environment(loader=FileSystemLoader(template_dir))
+
+        try:
+            jinja_template = env.get_template(f"{template_name}.html")
+            logger.info(f"Loaded email template: {template_name}.html")
+        except Exception as e:
+            logger.error(f"[SMTP EMAIL FAILED] Could not load template '{template_name}': {e}")
+            return  # Do NOT silently replace with a different template
 
     try:
         with smtplib.SMTP(smtp_server, smtp_port) as server:
@@ -63,9 +73,9 @@ def send_phishing_emails(
             server.login(smtp_user, smtp_pass)
 
             for target, token in zip(targets, tokens):
-                # Prefer user_id (FK to users table), fall back to row id
+                # Unique tracking link: /sim/{token} — validates token, logs LINK_CLICK, then redirects
+                sim_link = f"{settings.SIM_BASE_URL}/sim/{token.token}"
                 target_id = getattr(target, 'user_id', None) or getattr(target, 'id', None)
-                sim_link = f"{settings.SIM_BASE_URL}/sim/track?user_id={target_id}&campaign_id={campaign_id}"
                 tracking_pixel_url = (
                     f"{settings.SIM_BASE_URL}/sim/open"
                     f"?user_id={target_id}&campaign_id={campaign_id}"
@@ -73,16 +83,52 @@ def send_phishing_emails(
 
                 target_name = getattr(target, 'name', None) or "Employee"
 
-                html_content = template.render(
-                    employee_name=target_name,
-                    phishing_link=sim_link,
-                    user_id=target_id,
-                    campaign_id=campaign_id,
-                    tracking_pixel_url=tracking_pixel_url,
-                )
+                # ── Build HTML content ────────────────────────────────────────
+                if use_custom_body:
+                    # Render inline from the custom body stored with the campaign
+                    # Use replace instead of format to avoid KeyErrors from stray {} brackets in user's text
+                    rendered_body = custom_body.replace("{employee_name}", str(target_name))
+                    # Replace [CTA] placeholders (any bracket text) with real link
+                    import re
+                    def replace_cta(match):
+                        label = match.group(1)
+                        return (
+                            f'<a href="{sim_link}" style="display:inline-block;padding:10px 20px;'
+                            f'background:#0078d4;color:#fff;text-decoration:none;border-radius:4px;'
+                            f'font-weight:bold;">{label}</a>'
+                        )
+                    html_body_lines = []
+                    for line in rendered_body.split("\n"):
+                        line_html = re.sub(r'\[([^\]]+)\]', replace_cta, line)
+                        if line_html.strip() == "":
+                            html_body_lines.append("<br>")
+                        else:
+                            html_body_lines.append(f"<p style='margin:6px 0'>{line_html}</p>")
+
+                    html_content = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:30px;">
+  <div style="max-width:600px;margin:0 auto;background:#fff;padding:30px;border-radius:8px;border:1px solid #ddd;">
+    <img src="{tracking_pixel_url}" width="1" height="1" style="display:none" alt="">
+    {"".join(html_body_lines)}
+  </div>
+</body>
+</html>"""
+                else:
+                    html_content = jinja_template.render(
+                        employee_name=target_name,
+                        phishing_link=sim_link,
+                        user_id=target_id,
+                        campaign_id=campaign_id,
+                        tracking_pixel_url=tracking_pixel_url,
+                    )
+
+                # ── Construct and send the message ────────────────────────────
+                email_subject = custom_subject or "Important: Action Required"
 
                 msg = EmailMessage()
-                msg['Subject'] = 'Important: Action Required'
+                msg['Subject'] = email_subject
                 msg['From'] = smtp_from
                 msg['To'] = target.email
 

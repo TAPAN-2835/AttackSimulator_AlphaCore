@@ -134,6 +134,7 @@ export interface CampaignOut {
   id: number;
   name: string;
   description: string | null;
+  channel_type: string;
   attack_type: string;
   target_group: string | null;
   template_name: string | null;
@@ -146,11 +147,46 @@ export interface CampaignOut {
 export interface CampaignCreate {
   campaign_name: string;
   description?: string;
+  channel_type?: "EMAIL" | "SMS" | "WHATSAPP";
   attack_type: string;
   target_group?: string;
   template_id?: number;
   template_name?: string;
+  subject?: string;
+  body?: string;
   schedule_date?: string;
+  ai_model?: string;
+  ai_theme?: string;
+  ai_difficulty?: string;
+  ai_tone?: string;
+}
+
+export interface AIEmailGenerateRequest {
+  attack_type: string;
+  theme: string;
+  difficulty: string;
+  department: string;
+  tone: string;
+  model: string;
+}
+
+export interface AIEmailGenerateResponse {
+  subject: string;
+  body: string;
+  cta_text: string;
+}
+
+export interface DrillOption {
+  label: string;
+  score: number;
+  feedback: string;
+}
+
+export interface DrillScenario {
+  title: string;
+  description: string;
+  difficulty: string;
+  options: DrillOption[];
 }
 
 export async function fetchCampaigns(): Promise<CampaignOut[]> {
@@ -162,6 +198,21 @@ export async function createCampaign(payload: CampaignCreate): Promise<CampaignO
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export async function generateAIEmail(payload: AIEmailGenerateRequest): Promise<AIEmailGenerateResponse> {
+  return apiFetch<AIEmailGenerateResponse>("/ai/generate-phishing-email", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchDepartments(): Promise<string[]> {
+  return apiFetch<string[]>("/admin/departments");
+}
+
+export async function fetchRandomDrill(): Promise<DrillScenario> {
+  return apiFetch<DrillScenario>("/drills/random");
 }
 
 // ── Analytics ────────────────────────────────────────────────────────────────

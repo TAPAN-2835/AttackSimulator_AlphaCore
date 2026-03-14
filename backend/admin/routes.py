@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from analytics.models import RiskScore, RiskLevel
 from auth.models import User, UserRole
 from auth.service import require_admin, CurrentUser, require_analyst
-from campaigns.models import Campaign, CampaignTarget, CampaignStatus
+from campaigns.models import Campaign, CampaignTarget, CampaignStatus, ChannelType
 from database import get_db
 from events.models import Event
 from schemas.request_models import EventOut
@@ -22,11 +22,16 @@ class DashboardOverview(BaseModel):
     employees_tested: int
     avg_risk_score: float
     high_risk_users: int
+    email_campaigns: int = 0
+    sms_campaigns: int = 0
+    whatsapp_campaigns: int = 0
+    email_click_rate: float = 0.0
+    sms_click_rate: float = 0.0
+    whatsapp_click_rate: float = 0.0
 
 
 @router.get("/dashboard", response_model=DashboardOverview)
 async def dashboard(db: Annotated[AsyncSession, Depends(get_db)]):
-    print("Admin dashboard accessed")
     total_campaigns = (await db.execute(select(func.count()).select_from(Campaign))).scalar_one()
     active_campaigns = (await db.execute(
         select(func.count()).select_from(Campaign)
@@ -44,12 +49,55 @@ async def dashboard(db: Annotated[AsyncSession, Depends(get_db)]):
         .where(RiskScore.risk_level.in_([RiskLevel.HIGH, RiskLevel.CRITICAL]))
     )).scalar_one()
 
+    # Campaign counts by channel
+    camp_by_ch = await db.execute(
+        select(Campaign.channel_type, func.count().label("cnt")).group_by(Campaign.channel_type)
+    )
+    ch_counts = {row.channel_type: row.cnt for row in camp_by_ch}
+    email_campaigns = ch_counts.get(ChannelType.EMAIL, 0)
+    sms_campaigns = ch_counts.get(ChannelType.SMS, 0)
+    whatsapp_campaigns = ch_counts.get(ChannelType.WHATSAPP, 0)
+
+    # Click rates by channel (from events)
+    from events.models import EventType
+    email_click_rate = sms_click_rate = whatsapp_click_rate = 0.0
+    for ch_enum, sent_type, key in [
+        (ChannelType.EMAIL, EventType.EMAIL_SENT, "email"),
+        (ChannelType.SMS, EventType.SMS_SENT, "sms"),
+        (ChannelType.WHATSAPP, EventType.WHATSAPP_SENT, "whatsapp"),
+    ]:
+        sent_q = await db.execute(
+            select(func.count()).select_from(Event).join(Campaign, Event.campaign_id == Campaign.id).where(
+                Campaign.channel_type == ch_enum, Event.event_type == sent_type
+            )
+        )
+        sent = sent_q.scalar_one() or 0
+        click_q = await db.execute(
+            select(func.count()).select_from(Event).join(Campaign, Event.campaign_id == Campaign.id).where(
+                Campaign.channel_type == ch_enum, Event.event_type == EventType.LINK_CLICK
+            )
+        )
+        clicks = click_q.scalar_one() or 0
+        rate = round(clicks / sent * 100, 1) if sent else 0.0
+        if key == "email":
+            email_click_rate = rate
+        elif key == "sms":
+            sms_click_rate = rate
+        else:
+            whatsapp_click_rate = rate
+
     return DashboardOverview(
         total_campaigns=total_campaigns,
         active_campaigns=active_campaigns,
         employees_tested=employees_tested,
         avg_risk_score=avg_risk_score,
         high_risk_users=high_risk_users,
+        email_campaigns=email_campaigns,
+        sms_campaigns=sms_campaigns,
+        whatsapp_campaigns=whatsapp_campaigns,
+        email_click_rate=email_click_rate,
+        sms_click_rate=sms_click_rate,
+        whatsapp_click_rate=whatsapp_click_rate,
     )
 
 
@@ -116,7 +164,6 @@ async def recent_events(
     )
     events = result.scalars().all()
 
-    # Enrich with user/campaign names in bulk
     user_ids = {e.user_id for e in events if e.user_id}
     campaign_ids = {e.campaign_id for e in events if e.campaign_id}
 
@@ -125,15 +172,32 @@ async def recent_events(
         u_res = await db.execute(select(User.id, User.email).where(User.id.in_(user_ids)))
         users = {row.id: row.email for row in u_res}
 
-    campaigns: dict[int, str] = {}
+    campaigns: dict[int, tuple[str, str]] = {}  # id -> (name, channel_type)
     if campaign_ids:
-        c_res = await db.execute(select(Campaign.id, Campaign.name).where(Campaign.id.in_(campaign_ids)))
-        campaigns = {row.id: row.name for row in c_res}
+        c_res = await db.execute(
+            select(Campaign.id, Campaign.name, Campaign.channel_type).where(Campaign.id.in_(campaign_ids))
+        )
+        campaigns = {row.id: (row.name, row.channel_type.value if row.channel_type else "EMAIL") for row in c_res}
 
     out = []
     for e in events:
         o = EventOut.model_validate(e)
         o.user_email = users.get(e.user_id) if e.user_id else None
-        o.campaign_name = campaigns.get(e.campaign_id) if e.campaign_id else None
+        if e.campaign_id and e.campaign_id in campaigns:
+            o.campaign_name, o.channel = campaigns[e.campaign_id]
         out.append(o)
     return out
+
+
+@router.get("/departments", response_model=list[str])
+async def list_departments(db: Annotated[AsyncSession, Depends(get_db)]):
+    """Return a sorted list of distinct departments that have at least one employee."""
+    result = await db.execute(
+        select(func.distinct(User.department)).where(
+            User.department != None,
+            User.role == UserRole.employee,
+        )
+    )
+    departments = sorted(row[0] for row in result.all() if row[0])
+    return departments
+
