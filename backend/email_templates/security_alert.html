@@ -1,0 +1,25 @@
+<html>
+    <body style="font-family: Arial, sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: auto;">
+        <h2 style="color: #d9534f; border-bottom: 2px solid #eee; padding-bottom: 10px;">Security Alert: Unauthorized Login Attempt</h2>
+        <p>Dear {{employee_name}},</p>
+        <p>We detected an unusual login attempt on your corporate account from an unrecognized device.</p>
+        
+        <table style="background: #f9f9f9; width: 100%; border-radius: 5px; padding: 15px; margin-bottom: 20px;">
+            <tr><td><strong>Location:</strong> Moscow, Russia</td></tr>
+            <tr><td><strong>IP Address:</strong> 45.18.29.110</td></tr>
+            <tr><td><strong>Device:</strong> Unknown Windows PC</td></tr>
+        </table>
+        
+        <p>If you do not recognize this activity, please secure your account immediately by clicking the button below to update your security settings.</p>
+        
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="{{phishing_link}}" style="background-color: #d9534f; color: white; padding: 12px 25px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">
+                Review Security Activity
+            </a>
+        </div>
+        
+        <p style="font-size: 12px; color: #777;">Failure to secure your account within 2 hours may result in temporary suspension to protect corporate data.</p>
+        <p>Regards,<br>AlphaCore InfoSec Team</p>
+        <img src="{{tracking_pixel_url}}" width="1" height="1" style="display:none;border:0;outline:none;" alt="" />
+    </body>
+</html>

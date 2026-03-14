@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; line-height: 1.6; }
+        .container { max-width: 600px; margin: 20px auto; border: 1px solid #e0e0e0; border-radius: 4px; overflow: hidden; }
+        .header { background: #f3f3f3; padding: 20px; border-bottom: 1px solid #e0e0e0; }
+        .content { padding: 30px; }
+        .button { background-color: #0078d4; color: white; padding: 12px 24px; text-decoration: none; border-radius: 2px; display: inline-block; font-weight: 600; }
+        .footer { background: #f9f9f9; padding: 20px; font-size: 12px; color: #666; border-top: 1px solid #e0e0e0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/4/44/Microsoft_logo.svg" width="100" alt="Microsoft">
+        </div>
+        <div class="content">
+            <h2 style="margin-top: 0; color: #0078d4;">A document was shared with you</h2>
+            <p><strong>Finance Department</strong> has shared the following document with you via SharePoint:</p>
+            <div style="background: #f0f0f0; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                <p style="margin: 0;">📁 <strong>Q4_Salary_Adjustments_Draft.pdf</strong></p>
+            </div>
+            <p>This document contains sensitive information regarding the upcoming quarterly payroll updates. Please review and provide feedback by EOD.</p>
+            <p style="margin-top: 30px;">
+                <a href="{{ tracking_url }}" class="button">Open Document</a>
+            </p>
+        </div>
+        <div class="footer">
+            <p>This is an automated notification from Microsoft 365. Please do not reply to this email.</p>
+            <p>&copy; 2026 Microsoft Corporation. All rights reserved.</p>
+        </div>
+    </div>
+    <img src="{{ tracking_pixel_url }}" width="1" height="1" style="display:none;">
+</body>
+</html>

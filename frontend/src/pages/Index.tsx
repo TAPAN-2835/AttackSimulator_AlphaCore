@@ -87,12 +87,12 @@ const Index = () => {
             A powerful cybersecurity simulation platform that helps organizations train employees, detect behavioral risks, and strengthen security awareness through realistic phishing and attack simulations.
           </p>
           <div className="mt-8 flex items-center justify-center gap-4">
-            <Link to="/signup">
-              <GlowButton size="lg">Start Simulation</GlowButton>
+            <Link to="/login/admin">
+              <GlowButton size="lg">Admin Dashboard</GlowButton>
             </Link>
-            <Link to="/dashboard">
-              <GlowButton variant="outline" size="lg" glowColor="cyan" className="border-border text-foreground hover:text-accent-foreground">
-                View Demo
+            <Link to="/login/user">
+              <GlowButton variant="outline" size="lg" glowColor="purple" className="border-border text-foreground hover:text-accent-foreground">
+                Employee Portal
               </GlowButton>
             </Link>
           </div>

@@ -1,35 +1,62 @@
+import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
-import { useState } from "react";
+import { fetchRecentEvents, type EventOut } from "@/lib/api";
 
-const logs = [
-  { user: "j.smith@acme.co", action: "EMAIL_OPEN", campaign: "Q1 Phishing Test", time: "2026-03-13 14:32:01", ip: "192.168.1.45" },
-  { user: "m.jones@acme.co", action: "LINK_CLICK", campaign: "Q1 Phishing Test", time: "2026-03-13 14:32:15", ip: "192.168.1.102" },
-  { user: "a.wilson@acme.co", action: "CREDENTIAL_ATTEMPT", campaign: "Cred Harvest #4", time: "2026-03-13 14:33:02", ip: "10.0.0.55" },
-  { user: "r.davis@acme.co", action: "EMAIL_REPORTED", campaign: "Q1 Phishing Test", time: "2026-03-13 14:33:44", ip: "192.168.1.78" },
-  { user: "k.brown@acme.co", action: "FILE_DOWNLOAD", campaign: "Malware Sim #2", time: "2026-03-13 14:34:10", ip: "10.0.0.12" },
-  { user: "l.garcia@acme.co", action: "EMAIL_OPEN", campaign: "Exec Spear Phish", time: "2026-03-13 14:34:55", ip: "172.16.0.33" },
-  { user: "t.nguyen@acme.co", action: "LINK_CLICK", campaign: "Cred Harvest #4", time: "2026-03-13 14:35:22", ip: "10.0.0.88" },
-  { user: "s.patel@acme.co", action: "EMAIL_REPORTED", campaign: "Malware Sim #2", time: "2026-03-13 14:35:48", ip: "192.168.2.15" },
-  { user: "d.kim@acme.co", action: "EMAIL_OPEN", campaign: "Q1 Phishing Test", time: "2026-03-13 14:36:01", ip: "172.16.0.44" },
-  { user: "c.lee@acme.co", action: "CREDENTIAL_ATTEMPT", campaign: "Exec Spear Phish", time: "2026-03-13 14:36:30", ip: "10.0.0.99" },
-];
+// Removed mock data
 
 const actionColor: Record<string, string> = {
   EMAIL_OPEN: "bg-primary/20 text-primary border-primary/30",
+  EMAIL_SENT: "bg-primary/20 text-primary border-primary/30",
   LINK_CLICK: "bg-destructive/20 text-destructive border-destructive/30",
   CREDENTIAL_ATTEMPT: "bg-destructive/20 text-destructive border-destructive/30",
   FILE_DOWNLOAD: "bg-secondary/20 text-secondary border-secondary/30",
   EMAIL_REPORTED: "bg-green-500/20 text-green-400 border-green-500/30",
 };
 
+interface LogEntry {
+  user: string;
+  action: string;
+  campaign: string;
+  time: string;
+  ip: string;
+}
+
 const SystemLogs = () => {
   const [filter, setFilter] = useState("");
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+
+  useEffect(() => {
+    const toLogEntry = (e: EventOut): LogEntry => ({
+      user: e.user_email || `user_${e.user_id ?? "—"}`,
+      action: e.event_type,
+      campaign: e.campaign_name || `campaign_${e.campaign_id ?? "—"}`,
+      time: new Date(e.timestamp).toLocaleTimeString(),
+      ip: e.ip_address || "—",
+    });
+
+    // Fetch once immediately, then poll every 5 seconds
+    const loadEvents = () => {
+      fetchRecentEvents(100)
+        .then((events: EventOut[]) => {
+          if (events.length > 0) {
+            setLogs(events.map(toLogEntry));
+          }
+        })
+        .catch(() => {});
+    };
+
+    loadEvents();
+    const intervalId = setInterval(loadEvents, 5000);
+
+    return () => clearInterval(intervalId);
+  }, []);
+
   const filtered = logs.filter(
     (l) =>
-      l.user.includes(filter.toLowerCase()) ||
+      l.user.toLowerCase().includes(filter.toLowerCase()) ||
       l.action.includes(filter.toUpperCase()) ||
       l.campaign.toLowerCase().includes(filter.toLowerCase())
   );
@@ -68,15 +95,22 @@ const SystemLogs = () => {
                 <TableCell className="text-muted-foreground">{l.time}</TableCell>
                 <TableCell>{l.user}</TableCell>
                 <TableCell>
-                  <Badge variant="outline" className={actionColor[l.action]}>{l.action}</Badge>
+                  <Badge variant="outline" className={actionColor[l.action] || "bg-muted text-muted-foreground border-border"}>{l.action}</Badge>
                 </TableCell>
                 <TableCell className="text-muted-foreground">{l.campaign}</TableCell>
                 <TableCell className="text-muted-foreground">{l.ip}</TableCell>
               </TableRow>
             ))}
-          </TableBody>
-        </Table>
-      </div>
+            {filtered.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    No events recorded yet.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
     </div>
   );
 };

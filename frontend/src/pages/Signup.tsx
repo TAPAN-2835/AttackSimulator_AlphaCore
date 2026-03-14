@@ -1,19 +1,44 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Shield } from "lucide-react";
 import GridBackground from "@/components/GridBackground";
 import GlowButton from "@/components/GlowButton";
 import { Input } from "@/components/ui/input";
-
-import { useNavigate } from "react-router-dom";
 import { useRole } from "@/App";
+import { register as apiRegister } from "@/lib/api";
+import { toast } from "sonner";
 
 const Signup = () => {
   const navigate = useNavigate();
   const { setRole } = useRole();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleDemoLogin = (role: "admin" | "employee") => {
     setRole(role);
     navigate(role === "admin" ? "/dashboard" : "/dashboard/learning-portal");
+  };
+
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password !== confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+    setLoading(true);
+    try {
+      await apiRegister({ name, email, password });
+      toast.success("Account created! Please log in.");
+      navigate("/login");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Registration failed";
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -26,24 +51,26 @@ const Signup = () => {
             <span className="text-xl font-bold font-display">AttackSimulator</span>
           </div>
           <h1 className="text-2xl font-bold font-display text-center mb-6">Create your account</h1>
-          <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+          <form className="space-y-4" onSubmit={handleSignup}>
             <div>
-              <label className="text-sm text-muted-foreground block mb-1.5">Organization Name</label>
-              <Input placeholder="Acme Corp" className="bg-muted/50 border-border" />
+              <label className="text-sm text-muted-foreground block mb-1.5">Full Name</label>
+              <Input placeholder="John Doe" className="bg-muted/50 border-border" value={name} onChange={(e) => setName(e.target.value)} />
             </div>
             <div>
               <label className="text-sm text-muted-foreground block mb-1.5">Email</label>
-              <Input type="email" placeholder="admin@organization.com" className="bg-muted/50 border-border" />
+              <Input type="email" placeholder="admin@organization.com" className="bg-muted/50 border-border" value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
             <div>
               <label className="text-sm text-muted-foreground block mb-1.5">Password</label>
-              <Input type="password" placeholder="••••••••" className="bg-muted/50 border-border" />
+              <Input type="password" placeholder="••••••••" className="bg-muted/50 border-border" value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
             <div>
               <label className="text-sm text-muted-foreground block mb-1.5">Confirm Password</label>
-              <Input type="password" placeholder="••••••••" className="bg-muted/50 border-border" />
+              <Input type="password" placeholder="••••••••" className="bg-muted/50 border-border" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
             </div>
-            <GlowButton className="w-full" type="submit">Create Account</GlowButton>
+            <GlowButton className="w-full" type="submit" disabled={loading}>
+              {loading ? "Creating…" : "Create Account"}
+            </GlowButton>
           </form>
 
           <div className="relative my-8 text-center text-xs text-muted-foreground uppercase">

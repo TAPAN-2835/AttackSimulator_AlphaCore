@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   BarChart, Bar, LineChart, Line, AreaChart, Area, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
@@ -5,43 +6,77 @@ import {
 import { Download, TrendingUp } from "lucide-react";
 import GlowButton from "@/components/GlowButton";
 import { toast } from "sonner";
-
-const deptClick = [
-  { dept: "Finance", rate: 34 }, { dept: "HR", rate: 28 }, { dept: "Eng", rate: 12 },
-  { dept: "Sales", rate: 22 }, { dept: "Legal", rate: 18 }, { dept: "Mktg", rate: 26 },
-];
-
-const credTrend = [
-  { month: "Jan", rate: 12 }, { month: "Feb", rate: 10 }, { month: "Mar", rate: 8 },
-  { month: "Apr", rate: 11 }, { month: "May", rate: 7 }, { month: "Jun", rate: 5 },
-];
-
-const malwareData = [
-  { month: "Jan", attempts: 18 }, { month: "Feb", attempts: 14 }, { month: "Mar", attempts: 9 },
-  { month: "Apr", attempts: 12 }, { month: "May", attempts: 6 }, { month: "Jun", attempts: 4 },
-];
-
-const reportPie = [
-  { name: "Reported", value: 62 }, { name: "Not Reported", value: 38 },
-];
+import { fetchAnalyticsDashboard, fetchDepartmentRisk, fetchCampaignTrend, type AnalyticsOverview, type DeptRiskRate, type TrendPoint } from "@/lib/api";
 
 const COLORS = ["hsl(217,100%,60%)", "hsl(230,30%,18%)"];
-
 const tooltipStyle = { background: "hsl(230,40%,8%)", border: "1px solid hsl(230,30%,18%)", borderRadius: "8px", color: "hsl(210,40%,95%)" };
 
-const heatmapData = [
-  { dept: "Finance", phishing: 85, cred: 72, malware: 45 },
-  { dept: "HR", phishing: 68, cred: 55, malware: 38 },
-  { dept: "Engineering", phishing: 22, cred: 15, malware: 8 },
-  { dept: "Sales", phishing: 55, cred: 42, malware: 30 },
-  { dept: "Legal", phishing: 40, cred: 28, malware: 18 },
-  { dept: "Marketing", phishing: 60, cred: 48, malware: 35 },
-];
+const defaultOverview: AnalyticsOverview = {
+  click_rate: 0,
+  credential_rate: 0,
+  download_rate: 0,
+  report_rate: 0,
+  high_risk_departments: []
+};
 
 const riskColor = (v: number) =>
   v >= 70 ? "bg-destructive/60" : v >= 40 ? "bg-secondary/60" : "bg-green-500/40";
 
 const Analytics = () => {
+  const [overview, setOverview] = useState<AnalyticsOverview | null>(null);
+  const [deptRisk, setDeptRisk] = useState<DeptRiskRate[]>([]);
+  const [trend, setTrend] = useState<TrendPoint[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const refreshData = async () => {
+    try {
+      const [ov, dr, tr] = await Promise.all([
+        fetchAnalyticsDashboard(),
+        fetchDepartmentRisk(),
+        fetchCampaignTrend()
+      ]);
+      setOverview(ov);
+      setDeptRisk(dr);
+      setTrend(tr);
+    } catch (err) {
+      console.error("Failed to refresh analytics:", err);
+    }
+  };
+
+  useEffect(() => {
+    refreshData().finally(() => setLoading(false));
+
+    const interval = setInterval(refreshData, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-12 w-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-muted-foreground animate-pulse">Loading security analytics...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const data = overview || defaultOverview;
+
+  const deptClickData = (deptRisk || []).map(d => ({ dept: d.department, rate: d.click_rate }));
+
+  const reportPie = [
+    { name: "Reported", value: data.report_rate },
+    { name: "Not Reported", value: Math.max(0, 100 - data.report_rate) },
+  ];
+
+  const heatmapData = (deptRisk || []).map(d => ({
+    dept: d.department,
+    phishing: d.click_rate,
+    cred: d.credential_rate,
+    malware: d.download_rate,
+  }));
+
   const handleExport = (type: string) => {
     toast.success(`Generating ${type} report...`, {
       description: "Simulation analytics report will be ready in a moment.",
@@ -69,7 +104,7 @@ const Analytics = () => {
         <div className="glass rounded-lg p-5">
           <h3 className="text-sm font-semibold font-display mb-4">Phishing Click Rate by Department</h3>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={deptClick}>
+            <BarChart data={deptClickData}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(230,30%,18%)" />
               <XAxis dataKey="dept" stroke="hsl(215,20%,55%)" fontSize={11} />
               <YAxis stroke="hsl(215,20%,55%)" fontSize={12} />
@@ -82,12 +117,12 @@ const Analytics = () => {
         <div className="glass rounded-lg p-5">
           <h3 className="text-sm font-semibold font-display mb-4">Credential Submission Rate</h3>
           <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={credTrend}>
+            <LineChart data={trend}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(230,30%,18%)" />
-              <XAxis dataKey="month" stroke="hsl(215,20%,55%)" fontSize={12} />
+              <XAxis dataKey="campaign" stroke="hsl(215,20%,55%)" fontSize={11} />
               <YAxis stroke="hsl(215,20%,55%)" fontSize={12} />
               <Tooltip contentStyle={tooltipStyle} />
-              <Line type="monotone" dataKey="rate" stroke="hsl(270,80%,60%)" strokeWidth={2} dot={{ fill: "hsl(270,80%,60%)" }} />
+              <Line type="monotone" dataKey="credentials" stroke="hsl(270,80%,60%)" strokeWidth={2} dot={{ fill: "hsl(270,80%,60%)" }} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -95,7 +130,7 @@ const Analytics = () => {
         <div className="glass rounded-lg p-5">
           <h3 className="text-sm font-semibold font-display mb-4">Malware Download Attempts</h3>
           <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={malwareData}>
+            <AreaChart data={trend}>
               <defs>
                 <linearGradient id="cyanGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="hsl(185,100%,55%)" stopOpacity={0.4} />
@@ -103,10 +138,10 @@ const Analytics = () => {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(230,30%,18%)" />
-              <XAxis dataKey="month" stroke="hsl(215,20%,55%)" fontSize={12} />
+              <XAxis dataKey="campaign" stroke="hsl(215,20%,55%)" fontSize={11} />
               <YAxis stroke="hsl(215,20%,55%)" fontSize={12} />
               <Tooltip contentStyle={tooltipStyle} />
-              <Area type="monotone" dataKey="attempts" stroke="hsl(185,100%,55%)" fill="url(#cyanGrad)" strokeWidth={2} />
+              <Area type="monotone" dataKey="downloads" stroke="hsl(185,100%,55%)" fill="url(#cyanGrad)" strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -123,8 +158,8 @@ const Analytics = () => {
               </PieChart>
             </ResponsiveContainer>
             <div className="space-y-2 text-sm">
-              <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-full bg-primary" /> Reported: 62%</div>
-              <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-full bg-muted" /> Missed: 38%</div>
+              <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-full bg-primary" /> Reported: {reportPie[0]?.value ?? 0}%</div>
+              <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-full bg-muted" /> Missed: {reportPie[1]?.value ?? 0}%</div>
             </div>
           </div>
         </div>
@@ -167,16 +202,22 @@ const Analytics = () => {
               </tr>
             </thead>
             <tbody>
-              {heatmapData.map((row) => (
-                <tr key={row.dept} className="border-t border-border/50">
-                  <td className="p-2 font-medium">{row.dept}</td>
-                  {[row.phishing, row.cred, row.malware].map((v, i) => (
-                    <td key={i} className="p-2 text-center">
-                      <span className={`inline-block px-3 py-1 rounded text-xs font-bold ${riskColor(v)}`}>{v}%</span>
-                    </td>
-                  ))}
+              {heatmapData.length > 0 ? (
+                heatmapData.map((row) => (
+                  <tr key={row.dept} className="border-t border-border/50">
+                    <td className="p-2 font-medium">{row.dept}</td>
+                    {[row.phishing, row.cred, row.malware].map((v, i) => (
+                      <td key={i} className="p-2 text-center">
+                        <span className={`inline-block px-3 py-1 rounded text-xs font-bold ${riskColor(v)}`}>{v}%</span>
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              ) : (
+                <tr className="border-t border-border/50">
+                  <td colSpan={4} className="p-4 text-center text-muted-foreground">No departmental data available yet.</td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>

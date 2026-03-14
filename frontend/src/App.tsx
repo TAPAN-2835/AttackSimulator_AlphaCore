@@ -18,6 +18,7 @@ import Templates from "./pages/Templates";
 import PasswordTest from "./pages/PasswordTest";
 import ResponseDrills from "./pages/ResponseDrills";
 import EmployeeDashboard from "./pages/EmployeeDashboard";
+import TrainingPage from "./pages/TrainingPage";
 import NotFound from "./pages/NotFound";
 
 import { useState, createContext, useContext } from "react";
@@ -61,6 +62,8 @@ const App = () => {
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<Index />} />
+              <Route path="/login/admin" element={<Login overrideRole="admin" />} />
+              <Route path="/login/user" element={<Login overrideRole="employee" />} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
               
@@ -81,6 +84,7 @@ const App = () => {
               {/* Employee Routes */}
               <Route path="/dashboard/learning-portal" element={<DashboardPage requiredRole="employee"><EmployeeDashboard /></DashboardPage>} />
               
+              <Route path="/training" element={<TrainingPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
