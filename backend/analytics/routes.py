@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from analytics.models import RiskScore, RiskLevel
 from analytics.risk_engine import compute_and_save_risk, get_event_counts_for_user
-from auth.service import require_analyst, CurrentUser
 from auth.models import User, UserRole
 from campaigns.models import CampaignTarget, Campaign
 from events.models import Event, EventType
@@ -16,7 +15,7 @@ from database import get_db
 router = APIRouter()
 
 
-# ── Schemas ────────────────────────────────────────────────────────────────────
+# ── Schemas ─────────────────────────────────────────────────────────────
 
 class DeptRiskRate(BaseModel):
     department: str
@@ -29,6 +28,7 @@ class DeptRiskRate(BaseModel):
 class DeptScore(BaseModel):
     name: str
     score: float
+
 
 class OverviewResponse(BaseModel):
     click_rate: float
@@ -54,26 +54,56 @@ class TrendPoint(BaseModel):
     downloads: int
 
 
-# ── Routes ─────────────────────────────────────────────────────────────────────
+class EmployeeScoreResponse(BaseModel):
+    score: float
+    risk_level: RiskLevel
+    clicks: int
+    credentials: int
+    downloads: int
+
+
+# ── Routes ─────────────────────────────────────────────────────────────
+
 
 @router.get("/dashboard", response_model=OverviewResponse)
 async def analytics_dashboard(db: Annotated[AsyncSession, Depends(get_db)]):
-    total_targets = (await db.execute(select(func.count()).select_from(CampaignTarget))).scalar_one() or 1
 
-    clicks = (await db.execute(
-        select(func.count()).select_from(CampaignTarget).where(CampaignTarget.link_clicked == True)
-    )).scalar_one()
-    creds = (await db.execute(
-        select(func.count()).select_from(CampaignTarget).where(CampaignTarget.credential_attempt == True)
-    )).scalar_one()
-    downloads = (await db.execute(
-        select(func.count()).select_from(CampaignTarget).where(CampaignTarget.file_download == True)
-    )).scalar_one()
-    reported = (await db.execute(
-        select(func.count()).select_from(CampaignTarget).where(CampaignTarget.reported == True)
-    )).scalar_one()
+    total_targets = (
+        await db.execute(select(func.count()).select_from(CampaignTarget))
+    ).scalar_one() or 1
 
-    # High-risk departments: aggregate avg risk_score by user.department
+    clicks = (
+        await db.execute(
+            select(func.count())
+            .select_from(CampaignTarget)
+            .where(CampaignTarget.link_clicked == True)
+        )
+    ).scalar_one()
+
+    creds = (
+        await db.execute(
+            select(func.count())
+            .select_from(CampaignTarget)
+            .where(CampaignTarget.credential_attempt == True)
+        )
+    ).scalar_one()
+
+    downloads = (
+        await db.execute(
+            select(func.count())
+            .select_from(CampaignTarget)
+            .where(CampaignTarget.file_download == True)
+        )
+    ).scalar_one()
+
+    reported = (
+        await db.execute(
+            select(func.count())
+            .select_from(CampaignTarget)
+            .where(CampaignTarget.reported == True)
+        )
+    ).scalar_one()
+
     dept_rows = await db.execute(
         select(User.department, func.avg(RiskScore.risk_score).label("avg_score"))
         .join(RiskScore, User.id == RiskScore.user_id)
@@ -82,6 +112,7 @@ async def analytics_dashboard(db: Annotated[AsyncSession, Depends(get_db)]):
         .order_by(func.avg(RiskScore.risk_score).desc())
         .limit(5)
     )
+
     high_risk_depts = [
         DeptScore(name=row.department, score=round(row.avg_score, 1))
         for row in dept_rows
@@ -98,7 +129,11 @@ async def analytics_dashboard(db: Annotated[AsyncSession, Depends(get_db)]):
 
 @router.get("/user-risk/{user_id}", response_model=UserRiskResponse)
 async def user_risk(user_id: int, db: Annotated[AsyncSession, Depends(get_db)]):
-    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+
+    user = (
+        await db.execute(select(User).where(User.id == user_id))
+    ).scalar_one_or_none()
+
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -116,8 +151,9 @@ async def user_risk(user_id: int, db: Annotated[AsyncSession, Depends(get_db)]):
 
 @router.get("/department-risk", response_model=list[DeptRiskRate])
 async def department_risk(db: Annotated[AsyncSession, Depends(get_db)]):
-    # Use case() instead of cast() for SQLite compatibility
-    from sqlalchemy import case, Integer
+
+    from sqlalchemy import case
+
     rows = await db.execute(
         select(
             CampaignTarget.department,
@@ -130,52 +166,122 @@ async def department_risk(db: Annotated[AsyncSession, Depends(get_db)]):
         .where(CampaignTarget.department.isnot(None))
         .group_by(CampaignTarget.department)
     )
-    
+
     result = []
+
     for row in rows:
         total = row.total or 1
-        result.append(DeptRiskRate(
-            department=row.department, 
-            click_rate=round(int(row.clicked or 0) / total * 100, 1),
-            credential_rate=round(int(row.creds or 0) / total * 100, 1),
-            download_rate=round(int(row.downloads or 0) / total * 100, 1),
-            report_rate=round(int(row.reported or 0) / total * 100, 1),
-        ))
+
+        result.append(
+            DeptRiskRate(
+                department=row.department,
+                click_rate=round((row.clicked or 0) / total * 100, 1),
+                credential_rate=round((row.creds or 0) / total * 100, 1),
+                download_rate=round((row.downloads or 0) / total * 100, 1),
+                report_rate=round((row.reported or 0) / total * 100, 1),
+            )
+        )
+
     return sorted(result, key=lambda x: x.click_rate, reverse=True)
 
 
 @router.get("/campaign-trend", response_model=list[TrendPoint])
 async def campaign_trend(db: Annotated[AsyncSession, Depends(get_db)]):
-    campaigns = (await db.execute(select(Campaign).order_by(Campaign.created_at))).scalars().all()
+
+    campaigns = (
+        await db.execute(select(Campaign).order_by(Campaign.created_at))
+    ).scalars().all()
+
     result = []
+
     for c in campaigns:
-        totals = await db.execute(
-            select(func.count()).where(Event.campaign_id == c.id)
+
+        totals = (
+            await db.execute(
+                select(func.count()).where(Event.campaign_id == c.id)
+            )
+        ).scalar_one()
+
+        clicks = (
+            await db.execute(
+                select(func.count()).where(
+                    Event.campaign_id == c.id,
+                    Event.event_type == EventType.LINK_CLICK,
+                )
+            )
+        ).scalar_one()
+
+        creds = (
+            await db.execute(
+                select(func.count()).where(
+                    Event.campaign_id == c.id,
+                    Event.event_type == EventType.CREDENTIAL_ATTEMPT,
+                )
+            )
+        ).scalar_one()
+
+        downloads = (
+            await db.execute(
+                select(func.count()).where(
+                    Event.campaign_id == c.id,
+                    Event.event_type == EventType.FILE_DOWNLOAD,
+                )
+            )
+        ).scalar_one()
+
+        result.append(
+            TrendPoint(
+                campaign=c.name,
+                total_events=totals,
+                clicks=clicks,
+                credentials=creds,
+                downloads=downloads,
+            )
         )
-        clicks = (await db.execute(
-            select(func.count()).where(Event.campaign_id == c.id, Event.event_type == EventType.LINK_CLICK)
-        )).scalar_one()
-        creds = (await db.execute(
-            select(func.count()).where(Event.campaign_id == c.id, Event.event_type == EventType.CREDENTIAL_ATTEMPT)
-        )).scalar_one()
-        downloads = (await db.execute(
-            select(func.count()).where(Event.campaign_id == c.id, Event.event_type == EventType.FILE_DOWNLOAD)
-        )).scalar_one()
-        result.append(TrendPoint(
-            campaign=c.name,
-            total_events=totals.scalar_one(),
-            clicks=clicks,
-            credentials=creds,
-            downloads=downloads,
-        ))
+
     return result
 
 
 @router.post("/run-assessment")
 async def run_bulk_assessment(db: Annotated[AsyncSession, Depends(get_db)]):
-    """Triggers ML risk assessment for all employees."""
-    users = (await db.execute(select(User).where(User.role == UserRole.employee))).scalars().all()
+
+    users = (
+        await db.execute(
+            select(User).where(User.role == UserRole.employee)
+        )
+    ).scalars().all()
+
     for u in users:
         await compute_and_save_risk(db, u.id)
+
     await db.commit()
+
     return {"message": f"Risk assessment completed for {len(users)} employees"}
+
+
+# ── Chrome Extension Endpoint ───────────────────────────────────────────
+
+@router.get("/employee-score", response_model=EmployeeScoreResponse)
+async def get_employee_score(
+    email: str,
+    db: Annotated[AsyncSession, Depends(get_db)]
+):
+
+    user = (
+        await db.execute(select(User).where(User.email == email))
+    ).scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    rs = await compute_and_save_risk(db, user.id)
+
+    events = await get_event_counts_for_user(db, user.id)
+
+    return EmployeeScoreResponse(
+        score=rs.risk_score,
+        risk_level=rs.risk_level,
+        clicks=events.get("link_click", 0),
+        credentials=events.get("credential_attempt", 0),
+        downloads=events.get("file_download", 0),
+    )

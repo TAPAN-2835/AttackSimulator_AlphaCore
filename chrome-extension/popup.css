@@ -1,0 +1,56 @@
+body {
+  width: 260px;
+  margin: 0;
+  padding: 12px;
+  font-family: Arial, Helvetica, sans-serif;
+  background-color: #0f172a;
+  color: #ffffff;
+}
+
+h2 {
+  text-align: center;
+  color: #38bdf8;
+  margin-bottom: 10px;
+  font-size: 18px;
+}
+
+#scoreCard {
+  background-color: #1e293b;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+#scoreCard h3 {
+  margin: 4px 0;
+  font-size: 16px;
+}
+
+#scoreCard p {
+  margin: 4px 0;
+  font-size: 13px;
+}
+
+h3 {
+  font-size: 15px;
+  color: #facc15;
+  margin-top: 10px;
+  margin-bottom: 6px;
+}
+
+.tips {
+  padding-left: 18px;
+  font-size: 12px;
+}
+
+.tips li {
+  margin-bottom: 6px;
+}
+
+.footer {
+  text-align: center;
+  margin-top: 8px;
+  font-size: 11px;
+  color: #94a3b8;
+}
