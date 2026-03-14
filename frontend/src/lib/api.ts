@@ -297,6 +297,87 @@ export async function fetchUsers(): Promise<UserWithRisk[]> {
   return apiFetch<UserWithRisk[]>("/admin/users");
 }
 
+// ── Employee Directory & Groups ──────────────────────────────────────────────
+
+export interface Employee {
+  employee_id: number;
+  name: string;
+  email: string;
+  department: string | null;
+  phone: string | null;
+  status: "active" | "removed";
+}
+
+export interface GroupSummary {
+  group_id: number;
+  group_name: string;
+  description?: string | null;
+  members: number;
+  last_activity?: string | null;
+}
+
+export interface UploadSummary {
+  imported: number;
+  skipped: number;
+  new_groups_created: number;
+}
+
+export async function uploadEmployeesCsv(file: File): Promise<UploadSummary> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await fetch(`/api/admin/users/upload-csv`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || `CSV upload failed (${res.status})`);
+  }
+
+  return res.json();
+}
+
+export async function fetchGroups(): Promise<GroupSummary[]> {
+  return apiFetch<GroupSummary[]>("/admin/groups");
+}
+
+export async function createGroup(payload: {
+  group_name: string;
+  description?: string;
+  member_emails?: string[];
+}): Promise<GroupSummary> {
+  return apiFetch<GroupSummary>("/admin/groups/create", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchGroupMembers(groupId: number): Promise<Employee[]> {
+  return apiFetch<Employee[]>(`/admin/groups/${groupId}/members`);
+}
+
+export async function updateEmployee(payload: {
+  employee_id?: number;
+  email?: string;
+  name?: string;
+  phone?: string;
+  department?: string | null;
+  status?: "active" | "removed";
+}): Promise<Employee> {
+  return apiFetch<Employee>("/admin/users/update", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function removeEmployee(employee_id: number): Promise<void> {
+  await apiFetch<unknown>(`/admin/users/${employee_id}/remove`, {
+    method: "POST",
+  });
+}
+
 // ── Chatbot ──────────────────────────────────────────────────────────────────
 
 export interface ChatPayload {
