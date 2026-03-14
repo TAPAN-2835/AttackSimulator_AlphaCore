@@ -14,6 +14,7 @@ from campaigns.service import (
     upload_targets_from_csv,
     start_campaign,
     complete_campaign,
+    generate_whatsapp_link,
 )
 from database import get_db
 
@@ -152,3 +153,15 @@ async def create_template(
     await db.flush()
     await db.refresh(t)
     return t
+
+
+@router.get("/{campaign_id}/whatsapp-link")
+async def get_whatsapp_link(
+    campaign_id: int,
+    target_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Generate a WhatsApp click-to-chat link for a specific campaign target."""
+    link = await generate_whatsapp_link(db, campaign_id, target_id)
+    await db.commit()
+    return {"whatsapp_link": link}

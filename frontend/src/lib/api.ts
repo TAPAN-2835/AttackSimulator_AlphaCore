@@ -145,6 +145,28 @@ export interface CampaignOut {
   created_at: string;
 }
 
+export interface TargetOut {
+  id: number;
+  campaign_id: number;
+  user_id?: number | null;
+  email: string;
+  phone_number: string | null;
+  name: string | null;
+  department: string | null;
+  email_sent: boolean;
+  sms_sent: boolean;
+  whatsapp_sent: boolean;
+  email_opened: boolean;
+  link_clicked: boolean;
+  credential_attempt: boolean;
+  file_download: boolean;
+  reported: boolean;
+}
+
+export interface CampaignDetail extends CampaignOut {
+  targets: TargetOut[];
+}
+
 export interface CampaignCreate {
   campaign_name: string;
   description?: string;
@@ -160,6 +182,9 @@ export interface CampaignCreate {
   ai_theme?: string;
   ai_difficulty?: string;
   ai_tone?: string;
+  direct_target_email?: string;
+  direct_target_name?: string;
+  direct_target_phone?: string;
 }
 
 export interface AIEmailGenerateRequest {
@@ -199,6 +224,14 @@ export async function createCampaign(payload: CampaignCreate): Promise<CampaignO
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export async function fetchCampaignDetail(campaignId: number): Promise<CampaignDetail> {
+  return apiFetch<CampaignDetail>(`/campaigns/${campaignId}`);
+}
+
+export async function fetchWhatsAppLink(campaignId: number, targetId: number): Promise<{ whatsapp_link: string }> {
+  return apiFetch<{ whatsapp_link: string }>(`/campaigns/${campaignId}/whatsapp-link?target_id=${targetId}`);
 }
 
 export async function clearAllCampaigns(): Promise<void> {

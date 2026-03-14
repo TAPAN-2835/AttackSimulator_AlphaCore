@@ -1,12 +1,19 @@
 import { useEffect, useState } from "react";
-import { Plus, Sparkles, Send, Trash2 } from "lucide-react";
+import { Plus, Sparkles, Send, Trash2, Target, MessageCircle, ExternalLink, Loader2 } from "lucide-react";
 import GlassCard from "@/components/GlassCard";
 import GlowButton from "@/components/GlowButton";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { fetchCampaigns, createCampaign, fetchDepartments, generateAIEmail, clearAllCampaigns, type CampaignOut } from "@/lib/api";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { fetchCampaigns, createCampaign, fetchDepartments, generateAIEmail, clearAllCampaigns, fetchCampaignDetail, fetchWhatsAppLink, type CampaignOut, type CampaignDetail, type TargetOut } from "@/lib/api";
 import { toast } from "sonner";
 import { attackOptionsByChannel, type ChannelKey } from "@/config/attackChannels";
 
@@ -31,10 +38,16 @@ const statusColor: Record<string, string> = {
 const Campaigns = () => {
   const [showForm, setShowForm] = useState(false);
   const [showAIForm, setShowAIForm] = useState(false);
+  const [showDirectForm, setShowDirectForm] = useState(false);
   const [campaigns, setCampaigns] = useState<CampaignOut[]>([]);
   const [departments, setDepartments] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
   const [generating, setGenerating] = useState(false);
+
+  // Target List Modal State
+  const [selectedCampaign, setSelectedCampaign] = useState<CampaignDetail | null>(null);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+  const [isLinking, setIsLinking] = useState(false);
 
   // Default Form state
   const [formName, setFormName] = useState("");
@@ -45,6 +58,17 @@ const Campaigns = () => {
   const [formTargetGroup, setFormTargetGroup] = useState("");
   const [formTemplate, setFormTemplate] = useState("password_reset");
   const [formSchedule, setFormSchedule] = useState("");
+
+  // Direct Attack Form state
+  const [directEmail, setDirectEmail] = useState("");
+  const [directName, setDirectName] = useState("");
+  const [directPhone, setDirectPhone] = useState("");
+  const [directTargetType, setDirectTargetType] = useState<"email" | "phone">("email");
+  const [directDept, setDirectDept] = useState("");
+  const [directChannel, setDirectChannel] = useState<ChannelKey>("EMAIL");
+  const [directAttack, setDirectAttack] = useState<string>(
+    attackOptionsByChannel["EMAIL"][0]?.value ?? "phishing"
+  );
 
   // AI Form state
   const [aiName, setAiName] = useState("");
@@ -193,12 +217,83 @@ const Campaigns = () => {
     }
   };
 
+  const handleViewTargets = async (campaignId: number) => {
+    setIsLoadingDetail(true);
+    try {
+      const detail = await fetchCampaignDetail(campaignId);
+      setSelectedCampaign(detail);
+    } catch (err) {
+      toast.error("Failed to load campaign targets");
+    } finally {
+      setIsLoadingDetail(false);
+    }
+  };
+
+  const handleSendWhatsApp = async (campaignId: number, target: TargetOut) => {
+    setIsLinking(true);
+    try {
+      const { whatsapp_link } = await fetchWhatsAppLink(campaignId, target.id);
+      window.open(whatsapp_link, "_blank");
+      toast.success(`WhatsApp message prepared for ${target.name || target.email}`);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to generate WhatsApp link");
+    } finally {
+      setIsLinking(false);
+    }
+  };
+
   const rows = campaigns.map((c) => ({
     key: String(c.id), name: c.name,
     channel: c.channel_type || "EMAIL",
     type: attackTypeMap[c.attack_type] || c.attack_type,
     status: c.status, targets: "—", clickRate: "—",
   }));
+
+  const handleCreateDirect = async () => {
+    const targetValue = directTargetType === "email" ? directEmail : directPhone;
+    if (!targetValue) { 
+        toast.error(`Target ${directTargetType} is required for direct attack`); 
+        return; 
+    }
+    setCreating(true);
+    try {
+      const newCampaign = await createCampaign({
+        campaign_name: `Direct Attack: ${targetValue.split('@')[0]}`,
+        channel_type: directChannel,
+        attack_type: directAttack,
+        target_group: directDept || "General",
+        direct_target_email: directTargetType === "email" ? directEmail : undefined,
+        direct_target_name: directName || undefined,
+        direct_target_phone: directTargetType === "phone" ? directPhone : undefined,
+        template_name: directChannel === "EMAIL" ? "password_reset" : undefined,
+      });
+      setCampaigns((prev) => [newCampaign, ...prev]);
+      
+      if (directChannel === "WHATSAPP") {
+          toast.success("Direct attack created! Preparing WhatsApp link...");
+          // Need to fetch details to get the target.id
+          const detail = await fetchCampaignDetail(newCampaign.id);
+          const target = detail.targets[0];
+          if (target) {
+             const { whatsapp_link } = await fetchWhatsAppLink(newCampaign.id, target.id);
+             window.open(whatsapp_link, "_blank");
+          } else {
+             toast.info("WhatsApp link couldn't be auto-opened. Please check campaign targets.");
+          }
+      } else {
+          toast.success("Direct attack launched!");
+      }
+      
+      setShowDirectForm(false);
+      setDirectEmail("");
+      setDirectName("");
+      setDirectPhone("");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to launch attack");
+    } finally {
+      setCreating(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -211,15 +306,102 @@ const Campaigns = () => {
           <GlowButton onClick={handleClearAll} variant="outline" glowColor="purple" className="border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/30 dark:text-red-400 dark:hover:bg-red-900/20">
             <Trash2 className="h-4 w-4 mr-2" /> Clear All
           </GlowButton>
-          <GlowButton onClick={() => { setShowAIForm(true); setShowForm(false); }} glowColor="cyan" className="bg-cyan-100 text-cyan-700 border border-cyan-200 hover:bg-cyan-200 dark:bg-cyan-900/30 dark:text-cyan-400 dark:border-cyan-800 dark:hover:bg-cyan-900/50">
+          <GlowButton onClick={() => { setShowDirectForm(true); setShowForm(false); setShowAIForm(false); }} glowColor="purple" className="bg-orange-100 text-orange-700 border border-orange-200 hover:bg-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800 dark:hover:bg-orange-900/50">
+            <Target className="h-4 w-4 mr-2" /> Direct Attack
+          </GlowButton>
+          <GlowButton onClick={() => { setShowAIForm(true); setShowForm(false); setShowDirectForm(false); }} glowColor="cyan" className="bg-cyan-100 text-cyan-700 border border-cyan-200 hover:bg-cyan-200 dark:bg-cyan-900/30 dark:text-cyan-400 dark:border-cyan-800 dark:hover:bg-cyan-900/50">
             <Sparkles className="h-4 w-4 mr-2" /> AI Generator
           </GlowButton>
-          <GlowButton onClick={() => { setShowForm(true); setShowAIForm(false); }}>
+          <GlowButton onClick={() => { setShowForm(true); setShowAIForm(false); setShowDirectForm(false); }}>
             <Plus className="h-4 w-4 mr-1" /> Custom Campaign
           </GlowButton>
         </div>
       </div>
 
+      {showDirectForm && (
+        <GlassCard glow="purple" className="border-orange-200 dark:border-orange-800">
+          <div className="flex items-center gap-2 mb-6">
+            <Target className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+            <h3 className="text-lg font-semibold font-display text-orange-700 dark:text-orange-500">Fast Attack (Single Target)</h3>
+          </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div>
+              <label className="text-sm text-muted-foreground block mb-1.5">Target Type</label>
+              <select
+                className="flex h-10 w-full rounded-md border border-border bg-muted/50 px-3 py-2 text-sm"
+                value={directTargetType}
+                onChange={(e) => setDirectTargetType(e.target.value as "email" | "phone")}
+              >
+                <option value="email">Email</option>
+                <option value="phone">Phone Number</option>
+              </select>
+            </div>
+            {directTargetType === "email" ? (
+              <div>
+                <label className="text-sm text-muted-foreground block mb-1.5">Target Email</label>
+                <Input placeholder="victim@company.com" className="bg-muted/50 border-border" value={directEmail} onChange={(e) => setDirectEmail(e.target.value)} />
+              </div>
+            ) : (
+              <div>
+                <label className="text-sm text-muted-foreground block mb-1.5">Target Phone</label>
+                <Input placeholder="+91..." className="bg-muted/50 border-border" value={directPhone} onChange={(e) => setDirectPhone(e.target.value)} />
+              </div>
+            )}
+            <div>
+              <label className="text-sm text-muted-foreground block mb-1.5">Target Name (Optional)</label>
+              <Input placeholder="John Doe" className="bg-muted/50 border-border" value={directName} onChange={(e) => setDirectName(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground block mb-1.5">Department</label>
+              <select className="flex h-10 w-full rounded-md border border-border bg-muted/50 px-3 py-2 text-sm" value={directDept} onChange={(e) => setDirectDept(e.target.value)}>
+                <option value="">General</option>
+                {departments.map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground block mb-1.5">Channel</label>
+              <select
+                className="flex h-10 w-full rounded-md border border-border bg-muted/50 px-3 py-2 text-sm"
+                value={directChannel}
+                onChange={(e) => {
+                  setDirectChannel(e.target.value as ChannelKey);
+                  const first = attackOptionsByChannel[e.target.value as ChannelKey][0];
+                  setDirectAttack(first ? first.value : "");
+                }}
+              >
+                <option value="EMAIL">Email</option>
+                <option value="SMS">SMS</option>
+                <option value="WHATSAPP">WhatsApp</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground block mb-1.5">Attack Type</label>
+              <select
+                className="flex h-10 w-full rounded-md border border-border bg-muted/50 px-3 py-2 text-sm"
+                value={directAttack}
+                onChange={(e) => setDirectAttack(e.target.value)}
+              >
+                {attackOptionsByChannel[directChannel].map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="mt-6 flex gap-3">
+            <GlowButton size="sm" glowColor="purple" onClick={handleCreateDirect} disabled={creating || (directTargetType === "email" ? !directEmail : !directPhone)}>
+              <Send className="h-4 w-4 mr-2" />
+              {creating ? "Launching..." : "Launch Direct Attack"}
+            </GlowButton>
+            <GlowButton variant="outline" size="sm" onClick={() => setShowDirectForm(false)} className="border-border text-foreground">
+              Cancel
+            </GlowButton>
+          </div>
+        </GlassCard>
+      )}
       {showForm && (
         <GlassCard glow="blue">
           <h3 className="font-semibold font-display mb-4">Create Standard Campaign</h3>
@@ -417,6 +599,7 @@ const Campaigns = () => {
               <TableHead>Status</TableHead>
               <TableHead>Targets</TableHead>
               <TableHead>Click Rate</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -430,6 +613,18 @@ const Campaigns = () => {
                 </TableCell>
                 <TableCell>{c.targets}</TableCell>
                 <TableCell>{c.clickRate}</TableCell>
+                <TableCell className="text-right">
+                   <GlowButton 
+                     size="sm" 
+                     variant="outline" 
+                     glowColor="blue" 
+                     className="h-8 px-2"
+                     onClick={() => handleViewTargets(Number(c.key))}
+                   >
+                     <Target className="h-4 w-4 mr-1" />
+                     View Targets
+                   </GlowButton>
+                </TableCell>
               </TableRow>
             ))}
             {rows.length === 0 && (
@@ -442,6 +637,86 @@ const Campaigns = () => {
             </TableBody>
           </Table>
         </div>
+
+      {/* Target Details Modal */}
+      <Dialog open={!!selectedCampaign} onOpenChange={(open) => !open && setSelectedCampaign(null)}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto glass border-border/50">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold font-display flex items-center gap-2">
+              <Target className="h-5 w-5 text-primary" />
+              Campaign Targets: {selectedCampaign?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Manage individual targets and manual outreach for this campaign.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="mt-4">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border/50 hover:bg-transparent">
+                  <TableHead>Target</TableHead>
+                  <TableHead>Department</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Activity</TableHead>
+                  <TableHead className="text-right">Outreach</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {selectedCampaign?.targets.map((t) => (
+                  <TableRow key={t.id} className="border-border/40">
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-medium">{t.name || "Unknown User"}</span>
+                        <span className="text-[10px] text-muted-foreground">{t.email}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="bg-muted/50 font-normal">
+                        {t.department || "General"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        {t.email_sent && <span className="text-[10px] text-green-500 flex items-center gap-1">• Email Sent</span>}
+                        {t.sms_sent && <span className="text-[10px] text-green-500 flex items-center gap-1">• SMS Sent</span>}
+                        {t.whatsapp_sent && <span className="text-[10px] text-green-500 flex items-center gap-1">• WA Sent</span>}
+                        {!t.email_sent && !t.sms_sent && !t.whatsapp_sent && <span className="text-[10px] text-orange-500 flex items-center gap-1">• Pending</span>}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                         {t.email_opened && <Badge className="text-[9px] bg-blue-500/10 text-blue-500 border-blue-500/20">Opened</Badge>}
+                         {t.link_clicked && <Badge className="text-[9px] bg-orange-500/10 text-orange-500 border-orange-500/20">Clicked</Badge>}
+                         {t.credential_attempt && <Badge className="text-[9px] bg-red-500/10 text-red-500 border-red-500/20">PW Entered</Badge>}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <GlowButton 
+                        size="sm" 
+                        glowColor="cyan" 
+                        className="h-8 bg-green-500/10 hover:bg-green-500/20 text-green-600 border-green-500/20 dark:text-green-400"
+                        onClick={() => handleSendWhatsApp(selectedCampaign.id, t)}
+                        disabled={isLinking}
+                      >
+                        <MessageCircle className="h-4 w-4 mr-1" />
+                        WA
+                      </GlowButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {selectedCampaign?.targets.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      No targets found for this campaign.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

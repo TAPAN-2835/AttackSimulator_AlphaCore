@@ -60,6 +60,11 @@ class CampaignCreate(BaseModel):
     ai_difficulty: str | None = None
     ai_tone: str | None = None
 
+    # Direct Attack Fields
+    direct_target_email: str | None = None
+    direct_target_name: str | None = None
+    direct_target_phone: str | None = None
+
     @property
     def name(self): return self.campaign_name
     @property
