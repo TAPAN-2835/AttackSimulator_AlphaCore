@@ -3,7 +3,7 @@
  * All backend requests go through /api proxy (configured in vite.config.ts).
  */
 
-const API_BASE = "/api";
+const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
 // ── Token management ────────────────────────────────────────────────────────
 
