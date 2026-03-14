@@ -90,6 +90,9 @@ async def create_campaign(
         if template_name.endswith(".html"):
             template_name = template_name[:-5]
 
+        if attack_type == AttackType.malware_download and template_name == "password_reset":
+            template_name = "malware_update"
+
         campaign = Campaign(
             name=data.campaign_name,
             description=data.description,
@@ -97,7 +100,7 @@ async def create_campaign(
             attack_type=data.attack_type,
             target_group=data.target_group,
             template_name=template_name,
-            email_subject=getattr(data, "subject", None),
+            email_subject=getattr(data, "subject", None) or ("Action Required: Mandatory Security Patch" if template_name == "malware_update" else None),
             email_body=getattr(data, "body", None),
             template_id=template_id,
             scheduled_time=data.schedule_date,

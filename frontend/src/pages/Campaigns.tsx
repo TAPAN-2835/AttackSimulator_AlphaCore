@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Sparkles, Send, Trash2, Target, MessageCircle, ExternalLink, Loader2 } from "lucide-react";
+import { Plus, Sparkles, Send, Trash2, Target, MessageCircle, ExternalLink, Loader2, QrCode, ShieldAlert } from "lucide-react";
 import GlassCard from "@/components/GlassCard";
 import GlowButton from "@/components/GlowButton";
 import { Input } from "@/components/ui/input";
@@ -69,6 +69,9 @@ const Campaigns = () => {
   const [directAttack, setDirectAttack] = useState<string>(
     attackOptionsByChannel["EMAIL"][0]?.value ?? "phishing"
   );
+  const [directMalware, setDirectMalware] = useState(false);
+  const [directQR, setDirectQR] = useState(false);
+  const [generatedQRUrl, setGeneratedQRUrl] = useState<string | null>(null);
 
   // AI Form state
   const [aiName, setAiName] = useState("");
@@ -260,15 +263,21 @@ const Campaigns = () => {
       const newCampaign = await createCampaign({
         campaign_name: `Direct Attack: ${targetValue.split('@')[0]}`,
         channel_type: directChannel,
-        attack_type: directAttack,
+        attack_type: directMalware ? "malware_download" : directAttack,
         target_group: directDept || "General",
+        template_name: directMalware ? "malware_update" : "password_reset",
         direct_target_email: directTargetType === "email" ? directEmail : undefined,
         direct_target_name: directName || undefined,
         direct_target_phone: directTargetType === "phone" ? directPhone : undefined,
-        template_name: directChannel === "EMAIL" ? "password_reset" : undefined,
       });
       setCampaigns((prev) => [newCampaign, ...prev]);
       
+      const simUrl = `${window.location.protocol}//${window.location.hostname}:8000/sim/track?target_id=${newCampaign.id}&campaign_id=${newCampaign.id}`; // Simplified for direct
+      
+      if (directQR) {
+        setGeneratedQRUrl(`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(simUrl)}`);
+      }
+
       if (directChannel === "WHATSAPP") {
           toast.success("Direct attack created! Preparing WhatsApp link...");
           // Need to fetch details to get the target.id
@@ -391,6 +400,52 @@ const Campaigns = () => {
               </select>
             </div>
           </div>
+
+          <div className="mt-4 flex flex-wrap gap-4 p-4 rounded-lg bg-muted/30 border border-border/50">
+            <label className="flex items-center gap-2 cursor-pointer group">
+              <input 
+                type="checkbox" 
+                className="w-4 h-4 rounded border-border bg-background" 
+                checked={directMalware} 
+                onChange={(e) => setDirectMalware(e.target.checked)} 
+              />
+              <span className="text-sm font-medium flex items-center gap-1.5 group-hover:text-primary transition-colors">
+                <ShieldAlert className="h-4 w-4 text-red-500" />
+                Include Malware Attachment Simulation
+              </span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer group">
+              <input 
+                type="checkbox" 
+                className="w-4 h-4 rounded border-border bg-background" 
+                checked={directQR} 
+                onChange={(e) => setDirectQR(e.target.checked)} 
+              />
+              <span className="text-sm font-medium flex items-center gap-1.5 group-hover:text-primary transition-colors">
+                <QrCode className="h-4 w-4 text-blue-500" />
+                Generate QR Code for Attack
+              </span>
+            </label>
+          </div>
+
+          {generatedQRUrl && (
+            <div className="mt-6 p-6 rounded-xl bg-primary/5 border border-primary/20 flex flex-col items-center animate-in fade-in slide-in-from-top-4">
+              <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <QrCode className="h-4 w-4 text-primary" />
+                Attack QR Code Generated
+              </h4>
+              <div className="bg-white p-3 rounded-lg shadow-inner border border-primary/10">
+                <img src={generatedQRUrl} alt="Attack QR Code" className="w-40 h-40" />
+              </div>
+              <p className="text-xs text-muted-foreground mt-3 text-center max-w-[250px]">
+                Scan this code to test the simulation link immediately.
+              </p>
+              <GlowButton size="sm" variant="outline" className="mt-4" onClick={() => setGeneratedQRUrl(null)}>
+                Dismiss QR
+              </GlowButton>
+            </div>
+          )}
+
           <div className="mt-6 flex gap-3">
             <GlowButton size="sm" glowColor="purple" onClick={handleCreateDirect} disabled={creating || (directTargetType === "email" ? !directEmail : !directPhone)}>
               <Send className="h-4 w-4 mr-2" />
