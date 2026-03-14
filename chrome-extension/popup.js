@@ -1,47 +1,48 @@
-function loadScore(email) {
-
-fetch("http://127.0.0.1:8000/analytics/employee-score?email=" + email)
-.then(response => response.json())
-.then(data => {
-
-if(data.detail === "User not found"){
-
-document.getElementById("scoreCard").innerHTML = `
-<h3>No Risk Data Yet</h3>
-<p>User has not participated in any simulations.</p>
-`
-
-return
+function renderMessage(html) {
+  document.getElementById("scoreCard").innerHTML = html
 }
 
-document.getElementById("scoreCard").innerHTML = `
+function loadScore(email) {
+  renderMessage("<p>Loading score for " + email + "...</p>")
+
+  fetch("http://127.0.0.1:8000/analytics/employee-score?email=" + encodeURIComponent(email))
+    .then((response) => response.json())
+    .then((data) => {
+      if (data.detail === "User not found") {
+        renderMessage(`
+<h3>No Risk Data Yet</h3>
+<p>User has not participated in any simulations.</p>
+`)
+        return
+      }
+
+      renderMessage(`
 <h3>Score: ${data.score}</h3>
 <p>Risk Level: ${data.risk_level}</p>
 <p>Clicks: ${data.clicks}</p>
 <p>Credentials: ${data.credentials}</p>
 <p>Downloads: ${data.downloads}</p>
-`
-
-})
-.catch(error => {
-
-document.getElementById("scoreCard").innerHTML =
-"<p>Unable to fetch score</p>"
-
-console.error(error)
-
-})
-
+`)
+    })
+    .catch((error) => {
+      renderMessage("<p>Unable to fetch score</p>")
+      console.error(error)
+    })
 }
 
-chrome.identity.getProfileUserInfo(function(userInfo){
+// Try to use the email associated with the logged-in Breach user,
+// which the content script syncs into chrome.storage when you open the webapp.
+chrome.storage.sync.get(["userEmail"], (result) => {
+  let email = result.userEmail
 
-let email = userInfo.email
+  if (!email) {
+    renderMessage(`
+<h3>No Linked User</h3>
+<p>Open the Breach webapp, log in as an employee, then reload this popup.</p>
+`)
+    return
+  }
 
-if(!email){
-email = "demo@company.com"
-}
-
-loadScore(email)
-
+  loadScore(email)
 })
+
