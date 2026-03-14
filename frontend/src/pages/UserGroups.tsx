@@ -33,14 +33,21 @@ const UserGroups = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Fetch both on mount to have accurate counts in cards
+    fetchGroups()
+      .then(setGroups)
+      .catch(() => setGroups([]));
+    fetchUsers()
+      .then(setUsers)
+      .catch(() => setUsers([]));
+  }, []);
+
+  useEffect(() => {
+    // Refresh the active tab specifically if needed
     if (activeTab === "groups") {
-      fetchGroups()
-        .then(setGroups)
-        .catch(() => setGroups([]));
+      fetchGroups().then(setGroups);
     } else {
-      fetchUsers()
-        .then(setUsers)
-        .catch(() => setUsers([]));
+      fetchUsers().then(setUsers);
     }
   }, [activeTab]);
 
@@ -164,7 +171,7 @@ const UserGroups = () => {
           <div>
             <p className="text-sm text-muted-foreground">Total Users</p>
             <p className="text-2xl font-bold font-display">
-              {activeTab === "users" ? users.length : "2,548"}
+              {users.length}
             </p>
           </div>
         </GlassCard>
