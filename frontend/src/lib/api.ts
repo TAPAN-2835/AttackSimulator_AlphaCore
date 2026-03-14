@@ -185,6 +185,12 @@ export async function createCampaign(payload: CampaignCreate): Promise<CampaignO
   });
 }
 
+export async function clearAllCampaigns(): Promise<void> {
+  return apiFetch<void>("/campaigns/delete/all", {
+    method: "DELETE",
+  });
+}
+
 export async function generateAIEmail(payload: AIEmailGenerateRequest): Promise<AIEmailGenerateResponse> {
   return apiFetch<AIEmailGenerateResponse>("/ai/generate-phishing-email", {
     method: "POST",

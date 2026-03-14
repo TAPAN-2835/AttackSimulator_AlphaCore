@@ -59,17 +59,17 @@ const Dashboard = () => {
                   <stop offset="100%" stopColor="hsl(217,100%,60%)" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(226,20%,92%)" vertical={false} />
-              <XAxis dataKey="name" stroke="hsl(225,36%,73%)" fontSize={12} tickLine={false} axisLine={false} />
-              <YAxis stroke="hsl(225,36%,73%)" fontSize={12} tickLine={false} axisLine={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+              <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
+              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
               <Tooltip contentStyle={{ 
-                background: "hsl(0,0%,100%)", 
-                border: "1px solid hsl(226,20%,92%)", 
+                background: "hsl(var(--card))", 
+                border: "1px solid hsl(var(--border))", 
                 borderRadius: "12px", 
-                color: "hsl(222,47%,11%)",
-                boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.05)"
+                color: "hsl(var(--foreground))",
+                boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)"
               }} />
-              <Area type="monotone" dataKey="rate" stroke="hsl(217,100%,60%)" fill="url(#blueGrad)" strokeWidth={2} />
+              <Area type="monotone" dataKey="rate" stroke="hsl(var(--primary))" fill="url(#blueGrad)" strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -78,17 +78,17 @@ const Dashboard = () => {
           <h3 className="text-sm font-semibold font-display mb-4">Department Risk Levels</h3>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={deptData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(226,20%,92%)" vertical={false} />
-              <XAxis dataKey="dept" stroke="hsl(225,36%,73%)" fontSize={11} tickLine={false} axisLine={false} />
-              <YAxis stroke="hsl(225,36%,73%)" fontSize={12} tickLine={false} axisLine={false} />
-              <Tooltip cursor={{ fill: 'hsl(226,20%,96%)' }} contentStyle={{ 
-                background: "hsl(0,0%,100%)", 
-                border: "1px solid hsl(226,20%,92%)", 
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+              <XAxis dataKey="dept" stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} axisLine={false} />
+              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
+              <Tooltip cursor={{ fill: 'hsl(var(--muted) / 0.5)' }} contentStyle={{ 
+                background: "hsl(var(--card))", 
+                border: "1px solid hsl(var(--border))", 
                 borderRadius: "12px", 
-                color: "hsl(222,47%,11%)",
-                boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.05)"
+                color: "hsl(var(--foreground))",
+                boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)"
               }} />
-              <Bar dataKey="risk" fill="hsl(262,83%,58%)" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="risk" fill="hsl(var(--neon-purple))" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

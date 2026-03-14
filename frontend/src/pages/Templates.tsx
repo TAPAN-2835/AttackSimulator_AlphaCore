@@ -245,15 +245,15 @@ const Templates = () => {
                 <div
                   className={`p-2 rounded-lg ${
                     template.color === "blue"
-                      ? "bg-blue-100"
+                      ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
                       : template.color === "purple"
-                      ? "bg-violet-100"
-                      : "bg-cyan-100"
+                      ? "bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400"
+                      : "bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400"
                   }`}
                 >
-                  {template.type === "Phishing" && <Mail className="h-5 w-5 text-blue-600" />}
-                  {template.type === "Credential" && <KeyRound className="h-5 w-5 text-violet-600" />}
-                  {template.type === "Malware" && <Bug className="h-5 w-5 text-cyan-600" />}
+                  {template.type === "Phishing" && <Mail className="h-5 w-5" />}
+                  {template.type === "Credential" && <KeyRound className="h-5 w-5" />}
+                  {template.type === "Malware" && <Bug className="h-5 w-5" />}
                 </div>
                 <Badge variant="outline" className="text-[10px] uppercase tracking-wider text-muted-foreground">
                   {template.difficulty}

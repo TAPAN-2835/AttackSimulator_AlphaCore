@@ -9,6 +9,7 @@ import { useState } from "react";
 import { useRole } from "@/App";
 
 import { Badge } from "@/components/ui/badge";
+import ThemeToggle from "./ThemeToggle";
 
 const navItems = [
   { label: "Learning Portal", path: "/dashboard/learning-portal", icon: GraduationCap, role: "employee" },
@@ -20,8 +21,8 @@ const navItems = [
   { label: "Simulations", path: "/dashboard/simulations", icon: Play, role: "admin" },
   { label: "User Groups", path: "/dashboard/user-groups", icon: Users, role: "admin" },
   { label: "Templates", path: "/dashboard/templates", icon: Mail, role: "admin" },
-  { label: "Password Test", path: "/dashboard/password-test", icon: KeyRound },
-  { label: "Response Drills", path: "/dashboard/drills", icon: Shield },
+  { label: "Password Test", path: "/dashboard/password-test", icon: KeyRound, role: "employee" },
+  { label: "Response Drills", path: "/dashboard/drills", icon: Shield, role: "employee" },
 ];
 
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
@@ -86,8 +87,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
             )}>
               {role.toUpperCase()} MODE
             </Badge>
-            <span className="h-2 w-2 rounded-full bg-green-400 animate-pulse-glow" />
-            <span className="text-xs text-muted-foreground">System Online</span>
+            <ThemeToggle />
           </div>
         </header>
         <main className="p-6">{children}</main>

@@ -20,9 +20,9 @@ const distData = [
 ];
 
 const riskBadge: Record<string, string> = {
-  Low: "bg-green-100 text-green-700 border-green-200",
-  Medium: "bg-amber-100 text-amber-700 border-amber-200",
-  High: "bg-red-100 text-red-700 border-red-200",
+  Low: "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800",
+  Medium: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800",
+  High: "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800",
 };
 
 const RiskScoring = () => (
@@ -36,17 +36,17 @@ const RiskScoring = () => (
       <h3 className="text-sm font-semibold font-display mb-4">Risk Distribution</h3>
       <ResponsiveContainer width="100%" height={180}>
         <BarChart data={distData} layout="vertical">
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(226,20%,92%)" horizontal={false} />
-          <XAxis type="number" stroke="hsl(225,36%,73%)" fontSize={12} tickLine={false} axisLine={false} />
-          <YAxis type="category" dataKey="level" stroke="hsl(225,36%,73%)" fontSize={12} width={60} tickLine={false} axisLine={false} />
-          <Tooltip cursor={{ fill: 'hsl(226,20%,96%)' }} contentStyle={{ 
-            background: "hsl(0,0%,100%)", 
-            border: "1px solid hsl(226,20%,92%)", 
+          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+          <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
+          <YAxis type="category" dataKey="level" stroke="hsl(var(--muted-foreground))" fontSize={12} width={60} tickLine={false} axisLine={false} />
+          <Tooltip cursor={{ fill: 'hsl(var(--muted) / 0.5)' }} contentStyle={{ 
+            background: "hsl(var(--card))", 
+            border: "1px solid hsl(var(--border))", 
             borderRadius: "12px", 
-            color: "hsl(222,47%,11%)",
-            boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.05)"
+            color: "hsl(var(--foreground))",
+            boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)"
           }} />
-          <Bar dataKey="count" fill="hsl(262,83%,58%)" radius={[0, 4, 4, 0]} />
+          <Bar dataKey="count" fill="hsl(var(--chart-2))" radius={[0, 4, 4, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>

@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { Plus, Sparkles, Send } from "lucide-react";
+import { Plus, Sparkles, Send, Trash2 } from "lucide-react";
 import GlassCard from "@/components/GlassCard";
 import GlowButton from "@/components/GlowButton";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { fetchCampaigns, createCampaign, fetchDepartments, generateAIEmail, type CampaignOut } from "@/lib/api";
+import { fetchCampaigns, createCampaign, fetchDepartments, generateAIEmail, clearAllCampaigns, type CampaignOut } from "@/lib/api";
 import { toast } from "sonner";
 
 const attackTypeMap: Record<string, string> = {
@@ -17,12 +17,12 @@ const attackTypeMap: Record<string, string> = {
 };
 
 const statusColor: Record<string, string> = {
-  Active: "bg-green-100 text-green-700 border-green-200",
-  running: "bg-green-100 text-green-700 border-green-200",
-  Completed: "bg-primary/10 text-primary border-primary/20",
-  completed: "bg-primary/10 text-primary border-primary/20",
-  Scheduled: "bg-blue-100 text-blue-700 border-blue-200",
-  scheduled: "bg-blue-100 text-blue-700 border-blue-200",
+  Active: "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800",
+  running: "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800",
+  Completed: "bg-primary/10 text-primary border-primary/20 dark:bg-primary/20 dark:text-primary-foreground",
+  completed: "bg-primary/10 text-primary border-primary/20 dark:bg-primary/20 dark:text-primary-foreground",
+  Scheduled: "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800",
+  scheduled: "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800",
   Draft: "bg-muted text-muted-foreground border-border",
   draft: "bg-muted text-muted-foreground border-border",
 };
@@ -148,6 +148,17 @@ const Campaigns = () => {
     }
   };
 
+  const handleClearAll = async () => {
+    if (!window.confirm("Are you sure you want to clear all campaigns? This action cannot be undone.")) return;
+    try {
+      await clearAllCampaigns();
+      setCampaigns([]);
+      toast.success("All campaigns cleared");
+    } catch (err) {
+      toast.error("Failed to clear campaigns");
+    }
+  };
+
   const rows = campaigns.map((c) => ({
     key: String(c.id), name: c.name,
     type: attackTypeMap[c.attack_type] || c.attack_type,
@@ -162,7 +173,10 @@ const Campaigns = () => {
           <p className="text-muted-foreground text-sm mt-1">Create and manage attack simulations</p>
         </div>
         <div className="flex gap-3">
-          <GlowButton onClick={() => { setShowAIForm(true); setShowForm(false); }} glowColor="cyan" className="bg-cyan-100 text-cyan-700 border border-cyan-200 hover:bg-cyan-200">
+          <GlowButton onClick={handleClearAll} variant="outline" glowColor="purple" className="border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/30 dark:text-red-400 dark:hover:bg-red-900/20">
+            <Trash2 className="h-4 w-4 mr-2" /> Clear All
+          </GlowButton>
+          <GlowButton onClick={() => { setShowAIForm(true); setShowForm(false); }} glowColor="cyan" className="bg-cyan-100 text-cyan-700 border border-cyan-200 hover:bg-cyan-200 dark:bg-cyan-900/30 dark:text-cyan-400 dark:border-cyan-800 dark:hover:bg-cyan-900/50">
             <Sparkles className="h-4 w-4 mr-2" /> AI Generator
           </GlowButton>
           <GlowButton onClick={() => { setShowForm(true); setShowAIForm(false); }}>
@@ -213,10 +227,10 @@ const Campaigns = () => {
       )}
 
       {showAIForm && (
-        <GlassCard glow="cyan" className="border-cyan-200">
+        <GlassCard glow="cyan" className="border-cyan-200 dark:border-cyan-800">
           <div className="flex items-center gap-2 mb-6">
-            <Sparkles className="h-5 w-5 text-cyan-600" />
-            <h3 className="text-lg font-semibold font-display text-cyan-700">Generate AI Phishing Email</h3>
+            <Sparkles className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
+            <h3 className="text-lg font-semibold font-display text-cyan-700 dark:text-cyan-500">Generate AI Phishing Email</h3>
           </div>
           
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -293,7 +307,7 @@ const Campaigns = () => {
 
           {hasGenerated && (
             <div className="mt-8 pt-6 border-t border-border space-y-4 animate-in fade-in slide-in-from-bottom-4">
-              <h4 className="font-semibold text-cyan-700">Email Composer</h4>
+              <h4 className="font-semibold text-cyan-700 dark:text-cyan-500">Email Composer</h4>
               <p className="text-sm text-muted-foreground">The AI has generated the following email. You may edit it before launching.</p>
               
               <div className="space-y-4">

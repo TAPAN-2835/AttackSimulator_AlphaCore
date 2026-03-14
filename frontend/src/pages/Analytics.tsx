@@ -8,13 +8,13 @@ import GlowButton from "@/components/GlowButton";
 import { toast } from "sonner";
 import { fetchAnalyticsDashboard, fetchDepartmentRisk, fetchCampaignTrend, type AnalyticsOverview, type DeptRiskRate, type TrendPoint } from "@/lib/api";
 
-const COLORS = ["hsl(226,78%,49%)", "hsl(210,20%,90%)"]; /* Primary blue and soft secondary grey */
+const COLORS = ["hsl(var(--chart-1))", "hsl(var(--muted))"]; 
 const tooltipStyle = { 
-  background: "hsl(0,0%,100%)", 
-  border: "1px solid hsl(226,20%,92%)", 
+  background: "hsl(var(--card))", 
+  border: "1px solid hsl(var(--border))", 
   borderRadius: "12px", 
-  color: "hsl(222,47%,11%)",
-  boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.05)"
+  color: "hsl(var(--foreground))",
+  boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)"
 };
 
 const defaultOverview: AnalyticsOverview = {
@@ -111,11 +111,11 @@ const Analytics = () => {
           <h3 className="text-sm font-semibold font-display mb-4">Phishing Click Rate by Department</h3>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={deptClickData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(226,20%,92%)" vertical={false} />
-              <XAxis dataKey="dept" stroke="hsl(225,36%,73%)" fontSize={11} tickLine={false} axisLine={false} />
-              <YAxis stroke="hsl(225,36%,73%)" fontSize={12} tickLine={false} axisLine={false} />
-              <Tooltip cursor={{ fill: 'hsl(226,20%,96%)' }} contentStyle={tooltipStyle} />
-              <Bar dataKey="rate" fill="hsl(226,78%,49%)" radius={[4, 4, 0, 0]} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+              <XAxis dataKey="dept" stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} axisLine={false} />
+              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
+              <Tooltip cursor={{ fill: 'hsl(var(--muted) / 0.5)' }} contentStyle={tooltipStyle} />
+              <Bar dataKey="rate" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -124,11 +124,11 @@ const Analytics = () => {
           <h3 className="text-sm font-semibold font-display mb-4">Credential Submission Rate</h3>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={trend}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(226,20%,92%)" vertical={false} />
-              <XAxis dataKey="campaign" stroke="hsl(225,36%,73%)" fontSize={11} tickLine={false} axisLine={false} />
-              <YAxis stroke="hsl(225,36%,73%)" fontSize={12} tickLine={false} axisLine={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+              <XAxis dataKey="campaign" stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} axisLine={false} />
+              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
               <Tooltip contentStyle={tooltipStyle} />
-              <Line type="monotone" dataKey="credentials" stroke="hsl(262,83%,58%)" strokeWidth={3} dot={{ fill: "hsl(262,83%,58%)", r: 4 }} activeDot={{ r: 6 }} />
+              <Line type="monotone" dataKey="credentials" stroke="hsl(var(--chart-2))" strokeWidth={3} dot={{ fill: "hsl(var(--chart-2))", r: 4 }} activeDot={{ r: 6 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -139,15 +139,15 @@ const Analytics = () => {
             <AreaChart data={trend}>
               <defs>
                 <linearGradient id="cyanGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="hsl(185,100%,55%)" stopOpacity={0.4} />
-                  <stop offset="100%" stopColor="hsl(185,100%,55%)" stopOpacity={0} />
+                  <stop offset="0%" stopColor="hsl(var(--chart-3))" stopOpacity={0.4} />
+                  <stop offset="100%" stopColor="hsl(var(--chart-3))" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(226,20%,92%)" vertical={false} />
-              <XAxis dataKey="campaign" stroke="hsl(225,36%,73%)" fontSize={11} tickLine={false} axisLine={false} />
-              <YAxis stroke="hsl(225,36%,73%)" fontSize={12} tickLine={false} axisLine={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+              <XAxis dataKey="campaign" stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} axisLine={false} />
+              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
               <Tooltip contentStyle={tooltipStyle} />
-              <Area type="monotone" dataKey="downloads" stroke="hsl(199,89%,48%)" fill="url(#cyanGrad)" strokeWidth={3} />
+              <Area type="monotone" dataKey="downloads" stroke="hsl(var(--chart-3))" fill="url(#cyanGrad)" strokeWidth={3} />
             </AreaChart>
           </ResponsiveContainer>
         </div>

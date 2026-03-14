@@ -6,27 +6,24 @@
 
 @layer base {
   :root {
-    /* App Core Colors */
-    --background: 226 60% 98%; /* Beautiful light grayish blue */
-    --foreground: 222 47% 11%; /* Darker slate for maximum readability */
+    /* --- LIGHT THEME (Default) --- */
+    --background: 226 60% 98%;
+    --foreground: 222 47% 11%;
 
-    /* Cards and Surfaces */
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
 
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    /* Primary Actions */
-    --primary: 226 78% 49%; /* Express dashboard vibrant blue */
+    --primary: 226 78% 49%;
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary/Muted Elements */
     --secondary: 226 20% 90%;
     --secondary-foreground: 222 47% 11%;
 
     --muted: 210 20% 94%;
-    --muted-foreground: 215 16% 40%; /* Darker grey for readable secondary text */
+    --muted-foreground: 215 16% 45%;
 
     --accent: 226 78% 49%;
     --accent-foreground: 0 0% 100%;
@@ -34,15 +31,12 @@
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    /* Borders & Inputs */
     --border: 226 20% 92%;
     --input: 226 20% 92%;
     --ring: 226 78% 49%;
 
-    /* Shaping */
-    --radius: 1.25rem; /* Smoother, larger radius */
+    --radius: 1rem;
 
-    /* Sidebar Variables */
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 222 47% 11%;
     --sidebar-primary: 226 78% 49%;
@@ -52,12 +46,71 @@
     --sidebar-border: 226 20% 92%;
     --sidebar-ring: 226 78% 49%;
 
-    /* Legacy variables for compatibility */
     --neon-blue: 226 78% 49%;
     --neon-purple: 262 83% 58%;
     --neon-cyan: 199 89% 48%;
     --glass-bg: 0 0% 100%;
     --glass-border: 226 20% 92%;
+
+    /* Chart Tokens */
+    --chart-1: 226 78% 49%;
+    --chart-2: 262 83% 58%;
+    --chart-3: 199 89% 48%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+  }
+
+  .dark {
+    /* --- DARK THEME --- */
+    --background: 222 47% 4%;
+    --foreground: 210 40% 98%;
+
+    --card: 222 47% 6%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 47% 6%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 47% 4%;
+
+    --secondary: 222 47% 12%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 222 47% 12%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 217 91% 60%;
+    --accent-foreground: 222 47% 4%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 222 47% 12%;
+    --input: 222 47% 12%;
+    --ring: 217 91% 60%;
+
+    --sidebar-background: 222 47% 4%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 222 47% 4%;
+    --sidebar-accent: 222 47% 12%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 222 47% 12%;
+    --sidebar-ring: 217 91% 60%;
+
+    --neon-blue: 217 91% 60%;
+    --neon-purple: 262 83% 65%;
+    --neon-cyan: 191 91% 55%;
+    --glass-bg: 222 47% 6%;
+    --glass-border: 222 47% 12%;
+
+    /* Chart Tokens */
+    --chart-1: 217 91% 60%;
+    --chart-2: 262 83% 65%;
+    --chart-3: 191 91% 55%;
+    --chart-4: 280 80% 65%;
+    --chart-5: 340 85% 60%;
   }
 }
 
@@ -106,10 +159,10 @@
 
 @layer utilities {
   .glass {
-    background: hsla(var(--glass-bg) / 0.8);
+    background: hsla(var(--glass-bg) / 0.82);
     backdrop-filter: blur(12px);
     border: 1px solid hsla(var(--glass-border) / 1);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    box-shadow: 0 4px 25px rgba(0, 0, 0, 0.04);
   }
 
   .glass-strong {
@@ -173,8 +226,8 @@
   position: absolute;
   inset: -50%;
   background-image:
-    linear-gradient(hsla(226, 78%, 49%, 0.15) 1px, transparent 1px),
-    linear-gradient(90deg, hsla(226, 78%, 49%, 0.15) 1px, transparent 1px);
+    linear-gradient(hsla(var(--neon-blue) / 0.15) 1px, transparent 1px),
+    linear-gradient(90deg, hsla(var(--neon-blue) / 0.15) 1px, transparent 1px);
   background-size: 50px 50px;
   transform: rotateX(60deg) translateY(-100px); /* Techy floor effect */
   animation: grid-move 15s linear infinite;
@@ -188,8 +241,8 @@
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(hsla(222, 47%, 11%, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, hsla(222, 47%, 11%, 0.08) 1px, transparent 1px);
+    linear-gradient(hsla(var(--foreground) / 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, hsla(var(--foreground) / 0.08) 1px, transparent 1px);
   background-size: 100px 100px; /* Larger overlay grid */
 }
 

@@ -155,7 +155,7 @@ const CreateCampaign = () => {
         {/* ── Left column: Template info + config ────────────────────────── */}
         <div className="lg:col-span-2 space-y-5">
           {/* Template badge */}
-          <GlassCard glow={template.color as any} className="flex items-center gap-4">
+          <GlassCard glow={template.color as "blue" | "purple" | "cyan"} className="flex items-center gap-4">
             <div
               className={`p-3 rounded-lg bg-${
                 template.color === "blue"

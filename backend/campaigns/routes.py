@@ -105,3 +105,9 @@ async def delete_campaign(campaign_id: int, db: Annotated[AsyncSession, Depends(
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
     await db.delete(campaign)
+@router.delete("/delete/all", status_code=status.HTTP_204_NO_CONTENT)
+async def clear_all_campaigns(db: Annotated[AsyncSession, Depends(get_db)]):
+    from sqlalchemy import delete
+    await db.execute(delete(Campaign))
+    await db.commit()
+    return None

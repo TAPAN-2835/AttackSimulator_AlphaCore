@@ -60,7 +60,7 @@ const ResponseDrills = () => {
   if (drillCompleted) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6 text-center">
-        <div className={`p-6 rounded-full ${userScore > 100 ? 'bg-green-100 text-green-700' : 'bg-primary/10 text-primary'}`}>
+        <div className={`p-6 rounded-full ${userScore > 100 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-primary/10 text-primary dark:bg-primary/20'}`}>
           <Shield className="h-16 w-16" />
         </div>
         <div className="space-y-2">
@@ -110,19 +110,19 @@ const ResponseDrills = () => {
               className={`flex items-center gap-4 p-4 rounded-xl text-left transition-all border ${
                 selectedOption === idx
                   ? option.score > 50 
-                    ? "bg-green-50 border-green-200" 
-                    : "bg-red-50 border-red-200"
+                    ? "bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800" 
+                    : "bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800"
                   : selectedOption === null 
-                    ? "bg-muted/50 border-border hover:border-primary/50 hover:bg-muted" 
+                    ? "bg-muted/50 border-border hover:border-primary/50 hover:bg-muted dark:hover:bg-muted/80" 
                     : "bg-muted/20 border-border/50 opacity-50 cursor-not-allowed"
               }`}
             >
-              <div className={`p-2 rounded-lg ${selectedOption === idx ? "bg-background" : "bg-muted"}`}>
-                <option.icon className={`h-5 w-5 ${selectedOption === idx ? (option.score > 50 ? "text-green-600" : "text-red-600") : "text-muted-foreground"}`} />
+              <div className={`p-2 rounded-lg ${selectedOption === idx ? "bg-background dark:bg-muted/30" : "bg-muted"}`}>
+                <option.icon className={`h-5 w-5 ${selectedOption === idx ? (option.score > 50 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400") : "text-muted-foreground"}`} />
               </div>
               <span className="font-medium flex-1">{option.label}</span>
               {selectedOption === idx && (
-                <span className={`font-bold ${option.score > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                <span className={`font-bold ${option.score > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                   {option.score > 0 ? `+${option.score}` : option.score}
                 </span>
               )}
@@ -132,7 +132,7 @@ const ResponseDrills = () => {
 
         {selectedOption !== null && (
           <div className={`p-4 rounded-lg animate-in fade-in slide-in-from-top-2 duration-500 ${
-            scenario.options[selectedOption].score > 50 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+            scenario.options[selectedOption].score > 50 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
           }`}>
             <p className="text-sm font-semibold mb-1">Feedback:</p>
             <p className="text-xs text-foreground opacity-90">{scenario.options[selectedOption].feedback}</p>
