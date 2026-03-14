@@ -117,6 +117,7 @@ class UserWithRisk(BaseModel):
     email: str
     role: UserRole
     department: str | None
+    phone_number: str | None = None
     risk_score: float | None = None
     risk_level: RiskLevel | None = None
 
@@ -139,6 +140,7 @@ async def list_users(db: Annotated[AsyncSession, Depends(get_db)]):
         result.append(UserWithRisk(
             id=u.id, name=u.name, email=u.email,
             role=u.role, department=u.department,
+            phone_number=u.phone_number,
             risk_score=rs.risk_score if rs else None,
             risk_level=rs.risk_level if rs else None,
         ))
@@ -370,18 +372,17 @@ async def upload_users_csv(
     new_groups_created: set[str] = set()
 
     # Cache existing groups by lowercase name
-    existing_groups = (
+    # Using a simple dict of name -> id mappings for speed
+    existing_groups_raw = (
         await db.execute(select(Group.group_name, Group.group_id))
     ).all()
-    groups_by_name: dict[str, Group] = {}
-    for name, gid in existing_groups:
-        groups_by_name[name.lower()] = Group(
-            group_id=gid, group_name=name, description=None
-        )
+    groups_by_name: dict[str, int] = {
+        name.strip().lower(): gid for name, gid in existing_groups_raw
+    }
 
     # Existing employee/user emails
     existing_emp_emails = {
-        e for (e,) in (await db.execute(select(Employee.email))).all()
+        e.strip().lower() for (e,) in (await db.execute(select(Employee.email))).all()
     }
 
     from utils.security import hash_password
@@ -389,33 +390,42 @@ async def upload_users_csv(
     for row in reader:
         name = (row.get("name") or "").strip()
         email = (row.get("email") or "").strip().lower()
-        dept = (row.get("department") or "").strip()
-        phone = (row.get("phone") or "").strip()
+        dept = (row.get("department") or row.get("dept") or "").strip()
+        phone = (row.get("phone") or row.get("mobile") or "").strip()
 
-        if not email:
+        if not email or not dept:
             skipped += 1
             continue
+
         if email in existing_emp_emails:
-            skipped += 1
-            continue
-        if not dept:
+            # Optionally update info, but for now skip duplicates to avoid complexity
             skipped += 1
             continue
 
-        # Ensure group exists
+        # Ensure group exists (case-insensitive check)
         key = dept.lower()
-        group = groups_by_name.get(key)
-        if not group:
-            group = Group(group_name=dept, description=f"{dept} department")
-            db.add(group)
-            await db.flush()
-            groups_by_name[key] = group
-            new_groups_created.add(dept)
+        group_id = groups_by_name.get(key)
+        
+        if group_id is None:
+            # Double check with DB to be extra safe against race conditions
+            existing_q = await db.execute(select(Group).where(func.lower(Group.group_name) == key))
+            existing_g = existing_q.scalar_one_or_none()
+            
+            if existing_g:
+                group_id = existing_g.group_id
+                groups_by_name[key] = group_id
+            else:
+                new_group = Group(group_name=dept, description=f"{dept} department")
+                db.add(new_group)
+                await db.flush() # Get the ID
+                group_id = new_group.group_id
+                groups_by_name[key] = group_id
+                new_groups_created.add(dept)
 
         emp = Employee(
             name=name or email.split("@")[0],
             email=email,
-            department_id=group.group_id,
+            department_id=group_id,
             phone=phone or None,
             status=EmployeeStatus.active,
         )

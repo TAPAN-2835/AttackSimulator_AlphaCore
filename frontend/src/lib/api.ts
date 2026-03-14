@@ -323,6 +323,7 @@ export interface UserWithRisk {
   email: string;
   role: string;
   department: string | null;
+  phone_number: string | null;
   risk_score: number | null;
   risk_level: string | null;
 }
