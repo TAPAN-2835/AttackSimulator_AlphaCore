@@ -463,3 +463,17 @@ async def generate_whatsapp_link(
     )
     
     return whatsapp_url
+
+
+def generate_phishing_link(user_id: int | None, campaign_id: int, token: str) -> str:
+    """uid=<user_id>&cid=<campaign_id>&token=<token>"""
+    base = settings.phishing_base_url
+    uid = user_id if user_id else "0"
+    return f"{base}/phish/login?uid={uid}&cid={campaign_id}&token={token}"
+
+
+def generate_tracking_pixel(user_id: int | None, campaign_id: int) -> str:
+    """<img src='BASE_URL/email/open?uid=<user_id>&cid=<campaign_id>' ...>"""
+    base = settings.phishing_base_url
+    uid = user_id if user_id else "0"
+    return f"{base}/email/open?uid={uid}&cid={campaign_id}"
