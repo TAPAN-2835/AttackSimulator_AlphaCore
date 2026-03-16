@@ -1,13 +1,13 @@
 import logging
+import os
 import smtplib
 from email.message import EmailMessage
-from config import get_settings
+
+from config import get_settings, get_base_url
 from campaigns.models import CampaignTarget, SimulationToken
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
-
-import os
 
 def send_phishing_emails(
     targets: list[CampaignTarget],
@@ -72,12 +72,14 @@ def send_phishing_emails(
             server.ehlo()
             server.login(smtp_user, smtp_pass)
 
+            base_url = get_base_url()
+
             for target, token in zip(targets, tokens):
-                # Unique tracking link: /sim/{token} — validates token, logs LINK_CLICK, then redirects
-                sim_link = f"{settings.SIM_BASE_URL}/sim/{token.token}"
+                # Unique tracking link: /sim/{token} on the public backend domain
+                sim_link = f"{base_url}/phish/{token.token}"
                 target_id = getattr(target, 'user_id', None) or getattr(target, 'id', None)
                 tracking_pixel_url = (
-                    f"{settings.SIM_BASE_URL}/sim/open"
+                    f"{base_url}/sim/open"
                     f"?user_id={target_id}&campaign_id={campaign_id}"
                 )
 

@@ -24,8 +24,12 @@ _BASE_CSS = """
 """
 
 
-def microsoft_login_page(user_id: int, campaign_id: int, action_url: str, target_id: int | None = None) -> str:
-    extra = f'<input type="hidden" name="target_id" value="{target_id}">' if target_id else ""
+def microsoft_login_page(user_id: int | None, campaign_id: int | None, action_url: str, target_id: int | None = None, token: str | None = None) -> str:
+    hidden_fields = ""
+    if user_id is not None: hidden_fields += f'<input type="hidden" name="user_id" value="{user_id}">'
+    if campaign_id is not None: hidden_fields += f'<input type="hidden" name="campaign_id" value="{campaign_id}">'
+    if target_id is not None: hidden_fields += f'<input type="hidden" name="target_id" value="{target_id}">'
+    if token is not None: hidden_fields += f'<input type="hidden" name="token" value="{token}">'
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -43,26 +47,60 @@ def microsoft_login_page(user_id: int, campaign_id: int, action_url: str, target
     <div class="logo">🔵 Microsoft</div>
     <h2>Sign in</h2>
     <p>to continue to Microsoft 365</p>
-    <form method="POST" action="{action_url}">
-      <input type="hidden" name="user_id" value="{user_id}">
-      <input type="hidden" name="campaign_id" value="{campaign_id}">
-      {extra}
+    <form id="phish-form" method="POST" action="{action_url}" novalidate>
+      {hidden_fields}
       <label>Email or phone</label>
-      <input type="text" name="username" placeholder="user@company.com" required>
+      <input id="username" type="text" name="username" placeholder="user@company.com" required>
       <label>Password</label>
-      <input type="password" name="password" placeholder="Password" required>
+      <input id="password" type="password" name="password" placeholder="Password" required>
       <button type="submit">Next</button>
     </form>
+    <div id="error" style="margin-top:12px;font-size:12px;color:#b91c1c;display:none;"></div>
     <div style="margin-top: 24px; text-align: center; border-top: 1px solid #eee; pt-4">
       <a href="/sim/report?user_id={user_id}&campaign_id={campaign_id}" style="color: #6b7280; font-size: 12px; text-decoration: none;">Report suspicious email</a>
     </div>
   </div>
+  <script>
+    (function() {{
+      const form = document.getElementById("phish-form");
+      const emailInput = document.getElementById("username");
+      const passwordInput = document.getElementById("password");
+      const errorBox = document.getElementById("error");
+
+      function showError(msg) {{
+        errorBox.textContent = msg;
+        errorBox.style.display = "block";
+      }}
+
+      form.addEventListener("submit", function (e) {{
+        errorBox.style.display = "none";
+        const email = String(emailInput.value || "").trim();
+        const password = String(passwordInput.value || "");
+
+        const emailPattern = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+        if (!emailPattern.test(email)) {{
+          e.preventDefault();
+          showError("Please enter a valid email address.");
+          return;
+        }}
+        if (password.length < 8) {{
+          e.preventDefault();
+          showError("Password must be at least 8 characters long.");
+          return;
+        }}
+      }});
+    }})();
+  </script>
 </body>
 </html>"""
 
 
-def corporate_login_page(user_id: int, campaign_id: int, action_url: str, target_id: int | None = None) -> str:
-    extra = f'<input type="hidden" name="target_id" value="{target_id}">' if target_id else ""
+def corporate_login_page(user_id: int | None, campaign_id: int | None, action_url: str, target_id: int | None = None, token: str | None = None) -> str:
+    hidden_fields = ""
+    if user_id is not None: hidden_fields += f'<input type="hidden" name="user_id" value="{user_id}">'
+    if campaign_id is not None: hidden_fields += f'<input type="hidden" name="campaign_id" value="{campaign_id}">'
+    if target_id is not None: hidden_fields += f'<input type="hidden" name="target_id" value="{target_id}">'
+    if token is not None: hidden_fields += f'<input type="hidden" name="token" value="{token}">'
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -76,49 +114,81 @@ def corporate_login_page(user_id: int, campaign_id: int, action_url: str, target
     <div class="logo">🏢</div>
     <h2>Employee Portal</h2>
     <p>Please sign in with your corporate credentials</p>
-    <form method="POST" action="{action_url}">
-      <input type="hidden" name="user_id" value="{user_id}">
-      <input type="hidden" name="campaign_id" value="{campaign_id}">
-      {extra}
+    <form id="phish-form" method="POST" action="{action_url}" novalidate>
+      {hidden_fields}
       <label>Corporate Email</label>
-      <input type="email" name="username" placeholder="you@company.com" required>
+      <input id="username" type="email" name="username" placeholder="you@company.com" required>
       <label>Password</label>
-      <input type="password" name="password" placeholder="Password" required>
+      <input id="password" type="password" name="password" placeholder="Password" required>
       <button type="submit">Sign In</button>
     </form>
+    <div id="error" style="margin-top:12px;font-size:12px;color:#b91c1c;display:none;"></div>
     <div style="margin-top: 24px; text-align: center; border-top: 1px solid #eee; pt-4">
       <a href="/sim/report?user_id={user_id}&campaign_id={campaign_id}" style="color: #6b7280; font-size: 12px; text-decoration: none;">Report suspicious email</a>
     </div>
   </div>
+  <script>
+    (function() {{
+      const form = document.getElementById("phish-form");
+      const emailInput = document.getElementById("username");
+      const passwordInput = document.getElementById("password");
+      const errorBox = document.getElementById("error");
+
+      function showError(msg) {{
+        errorBox.textContent = msg;
+        errorBox.style.display = "block";
+      }}
+
+      form.addEventListener("submit", function (e) {{
+        errorBox.style.display = "none";
+        const email = String(emailInput.value || "").trim();
+        const password = String(passwordInput.value || "");
+
+        const emailPattern = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+        if (!emailPattern.test(email)) {{
+          e.preventDefault();
+          showError("Please enter a valid email address.");
+          return;
+        }}
+        if (password.length < 8) {{
+          e.preventDefault();
+          showError("Password must be at least 8 characters long.");
+          return;
+        }}
+      }});
+    }})();
+  </script>
 </body>
 </html>"""
 
 
-def awareness_page() -> str:
-    return """<!DOCTYPE html>
+def awareness_page(campaign_name: str | None = None) -> str:
+    campaign_info = f"<p>Campaign: <strong>{campaign_name}</strong></p>" if campaign_name else ""
+    return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>⚠️ Phishing Simulation Alert</title>
   <style>
-    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
          background:#0f172a;display:flex;justify-content:center;align-items:center;
-         height:100vh;margin:0;}
-    .card{background:#1e293b;border:1px solid #f59e0b;border-radius:12px;
-          padding:48px;max-width:480px;width:100%;color:#f1f5f9;}
-    h1{font-size:28px;color:#f59e0b;margin:0 0 16px;}
-    p{line-height:1.7;color:#94a3b8;margin:0 0 16px;}
-    ul{color:#94a3b8;line-height:2;}
-    .badge{display:inline-block;padding:4px 12px;background:#f59e0b22;
+         height:100vh;margin:0;}}
+    .card{{background:#1e293b;border:1px solid #f59e0b;border-radius:12px;
+          padding:48px;max-width:480px;width:100%;color:#f1f5f9;}}
+    h1{{font-size:28px;color:#f59e0b;margin:0 0 16px;}}
+    p{{line-height:1.7;color:#94a3b8;margin:0 0 16px;}}
+    ul{{color:#94a3b8;line-height:2;}}
+    .badge{{display:inline-block;padding:4px 12px;background:#f59e0b22;
            border:1px solid #f59e0b;border-radius:20px;font-size:13px;
-           color:#f59e0b;margin-bottom:24px;}
+           color:#f59e0b;margin-bottom:24px;}}
   </style>
 </head>
 <body>
   <div class="card">
     <span class="badge">⚠️ Security Awareness Training</span>
     <h1>You fell for a phishing simulation.</h1>
+    {campaign_info}
     <p>This was a <strong>controlled exercise</strong> run by your IT Security team.
        No real data was captured or stored.</p>
     <p>Remember these warning signs:</p>

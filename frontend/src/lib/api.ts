@@ -178,6 +178,7 @@ export interface CampaignCreate {
   subject?: string;
   body?: string;
   schedule_date?: string;
+  landing_page_url?: string;
   ai_model?: string;
   ai_theme?: string;
   ai_difficulty?: string;
@@ -275,6 +276,14 @@ export interface UserRiskListResponse {
   distribution: Record<string, number>;
 }
 
+export interface TrendPoint {
+  campaign: string;
+  total_events: number;
+  clicks: number;
+  credentials: number;
+  downloads: number;
+}
+
 export interface AnalyticsOverview {
   click_rate: number;
   credential_rate: number;
@@ -291,16 +300,39 @@ export interface DeptRiskRate {
   report_rate: number;
 }
 
-export interface TrendPoint {
-  campaign: string;
-  total_events: number;
-  clicks: number;
-  credentials: number;
-  downloads: number;
+export interface AiInsightsResponse {
+  insights: string[];
+}
+
+export interface LatestFeedbackResponse {
+  campaign_name: string;
+  attack_type: string;
+  link_clicked: boolean;
+  credential_attempt: boolean;
+  file_download: boolean;
+  attack_indicators: string[];
+}
+
+export interface UserRiskResponse {
+  user_id: number;
+  email: string;
+  risk_score: number;
+  risk_level: string;
+  correct_detection_count: number;
+  incorrect_detection_count: number;
+  events: Record<string, number>;
 }
 
 export async function fetchAnalyticsDashboard(): Promise<AnalyticsOverview> {
   return apiFetch<AnalyticsOverview>("/analytics/dashboard");
+}
+
+export async function fetchLatestFeedback(): Promise<LatestFeedbackResponse | null> {
+  return apiFetch<LatestFeedbackResponse | null>("/analytics/latest-feedback");
+}
+
+export async function fetchUserRisk(userId: number): Promise<UserRiskResponse> {
+  return apiFetch<UserRiskResponse>(`/analytics/user-risk/${userId}`);
 }
 
 export async function fetchUserRiskList(): Promise<UserRiskListResponse> {
@@ -313,6 +345,32 @@ export async function fetchDepartmentRisk(): Promise<DeptRiskRate[]> {
 
 export async function fetchCampaignTrend(): Promise<TrendPoint[]> {
   return apiFetch<TrendPoint[]>("/analytics/campaign-trend");
+}
+
+export async function fetchAiInsights(): Promise<AiInsightsResponse> {
+  return apiFetch<AiInsightsResponse>("/analytics/ai-insights");
+}
+
+export async function downloadDetailReport(): Promise<void> {
+  const token = getToken();
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_BASE}/analytics/export-report`, {
+    headers,
+  });
+
+  if (!res.ok) throw new Error("Failed to generate report");
+
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `Security_Report_${new Date().toISOString().split("T")[0]}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
 }
 
 // ── Users ────────────────────────────────────────────────────────────────────

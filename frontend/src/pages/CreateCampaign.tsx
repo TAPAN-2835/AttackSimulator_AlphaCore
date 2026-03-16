@@ -77,6 +77,7 @@ const CreateCampaign = () => {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [department, setDepartment] = useState("all");
+  const [landingPageUrl, setLandingPageUrl] = useState("");
   const [sendMode, setSendMode] = useState<"immediate" | "scheduled">("immediate");
   const [scheduleDate, setScheduleDate] = useState("");
   const [departments, setDepartments] = useState<string[]>([]);
@@ -126,6 +127,7 @@ const CreateCampaign = () => {
         template_name: template.id,
         subject: subject,
         body: body,
+        landing_page_url: landingPageUrl || undefined,
         target_group: department === "all" ? undefined : department,
         schedule_date:
           sendMode === "scheduled" && scheduleDate
@@ -242,6 +244,23 @@ const CreateCampaign = () => {
               onChange={(e) => setCampaignName(e.target.value)}
             />
           </GlassCard>
+
+          {/* Landing Page URL (Only for Phishing/Spear Phishing) */}
+          {(templateId === "custom" ? customAttackType === "Phishing" : template.type === "Phishing") && (
+            <GlassCard>
+              <label className="text-sm font-medium text-foreground block mb-1.5">
+                Landing Page URL
+                <span className="ml-2 text-xs text-muted-foreground font-normal">(Optional: redirect here instead of awareness page)</span>
+              </label>
+              <Input
+                id="landing-page-url"
+                placeholder="e.g. https://example.com/login-portal"
+                className="bg-muted/50 border-border"
+                value={landingPageUrl}
+                onChange={(e) => setLandingPageUrl(e.target.value)}
+              />
+            </GlassCard>
+          )}
 
           {/* Email Subject */}
           <GlassCard>

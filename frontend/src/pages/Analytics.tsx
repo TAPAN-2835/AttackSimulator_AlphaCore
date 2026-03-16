@@ -6,7 +6,7 @@ import {
 import { Download, TrendingUp } from "lucide-react";
 import GlowButton from "@/components/GlowButton";
 import { toast } from "sonner";
-import { fetchAnalyticsDashboard, fetchDepartmentRisk, fetchCampaignTrend, type AnalyticsOverview, type DeptRiskRate, type TrendPoint } from "@/lib/api";
+import { fetchAnalyticsDashboard, fetchDepartmentRisk, fetchCampaignTrend, downloadDetailReport, type AnalyticsOverview, type DeptRiskRate, type TrendPoint } from "@/lib/api";
 
 const COLORS = ["hsl(var(--chart-1))", "hsl(var(--muted))"]; 
 const tooltipStyle = { 
@@ -83,7 +83,21 @@ const Analytics = () => {
     malware: d.download_rate,
   }));
 
-  const handleExport = (type: string) => {
+  const handleExport = async (type: string) => {
+    if (type === "PDF") {
+      try {
+        toast.info("Generating security report...", {
+          description: "Your detailed report is being compiled and will download shortly.",
+        });
+        await downloadDetailReport();
+        toast.success("Report downloaded successfully");
+      } catch (err) {
+        toast.error("Failed to generate report");
+        console.error(err);
+      }
+      return;
+    }
+    
     toast.success(`Generating ${type} report...`, {
       description: "Simulation analytics report will be ready in a moment.",
     });

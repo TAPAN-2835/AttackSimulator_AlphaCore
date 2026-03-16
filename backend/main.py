@@ -16,7 +16,7 @@ import employees.models  # noqa: F401
 from auth.routes import router as auth_router
 from campaigns.routes import router as campaigns_router
 from events.routes import router as events_router
-from simulation.routes import router as simulation_router
+from simulation.routes import router as simulation_router, phish_router
 from analytics.routes import router as analytics_router
 from admin.routes import router as admin_router
 from templates.routes import router as templates_router
@@ -86,6 +86,7 @@ app.include_router(auth_router,       prefix="/auth",       tags=["Auth"])
 app.include_router(campaigns_router,  prefix="/campaigns",  tags=["Campaigns"])
 app.include_router(events_router,     prefix="/events",     tags=["Events"])
 app.include_router(simulation_router, prefix="/sim",        tags=["Simulation"])
+app.include_router(phish_router,      prefix="",            tags=["Phishing"])
 app.include_router(analytics_router,  prefix="/analytics",  tags=["Analytics"])
 app.include_router(admin_router,      prefix="/admin",      tags=["Admin"])
 app.include_router(templates_router,  prefix="/templates",  tags=["Templates"])

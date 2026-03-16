@@ -51,6 +51,7 @@ class CampaignCreate(BaseModel):
     body: str | None = None
     schedule_date: datetime | None = None
     attack_indicators: list[str] = []
+    landing_page_url: str | None = None
 
     # Keep aliases or old fields if needed for transition, but here we replace for strictness
     
@@ -84,6 +85,7 @@ class CampaignOut(BaseModel):
     created_by: int
     created_at: datetime
     attack_indicators: list[str] | None = None
+    landing_page_url: str | None = None
 
     model_config = {"from_attributes": True}
 

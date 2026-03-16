@@ -79,6 +79,7 @@ class Campaign(Base):
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     attack_indicators: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    landing_page_url: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     targets: Mapped[list["CampaignTarget"]] = relationship(back_populates="campaign")
     tokens: Mapped[list["SimulationToken"]] = relationship(back_populates="campaign")

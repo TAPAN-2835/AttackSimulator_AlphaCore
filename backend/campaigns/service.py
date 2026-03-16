@@ -107,6 +107,7 @@ async def create_campaign(
             created_by=created_by,
             status=CampaignStatus.scheduled if data.schedule_date else CampaignStatus.draft,
             attack_indicators=data.attack_indicators or [],
+            landing_page_url=getattr(data, "landing_page_url", None),
         )
         db.add(campaign)
         await db.flush()  # Gets the campaign.id
@@ -218,8 +219,12 @@ async def start_campaign(db: AsyncSession, campaign: Campaign) -> Campaign:
     db.add(campaign)
     await db.flush()
     
-    # 2. Fetch all targets + associated tokens
-    result = await db.execute(select(CampaignTarget).where(CampaignTarget.campaign_id == campaign.id))
+    # 2. Fetch all targets + associated tokens (Deterministic ordering by email)
+    result = await db.execute(
+        select(CampaignTarget)
+        .where(CampaignTarget.campaign_id == campaign.id)
+        .order_by(CampaignTarget.email)
+    )
     targets = result.scalars().all()
     
     # NEW: If no targets uploaded, pull all employees from database
@@ -275,7 +280,11 @@ async def start_campaign(db: AsyncSession, campaign: Campaign) -> Campaign:
         targets = new_targets
         tokens = new_tokens
     else:
-        t_result = await db.execute(select(SimulationToken).where(SimulationToken.campaign_id == campaign.id))
+        t_result = await db.execute(
+            select(SimulationToken)
+            .where(SimulationToken.campaign_id == campaign.id)
+            .order_by(SimulationToken.target_email)
+        )
         tokens = t_result.scalars().all()
 
     tokens_list = list(tokens)
@@ -315,7 +324,7 @@ async def start_campaign(db: AsyncSession, campaign: Campaign) -> Campaign:
                 if not phone:
                     logger.warning(f"Skipping SMS for target {target.email}: no phone_number")
                     continue
-                sim_link = f"{settings.SIM_BASE_URL}/sim/{token.token}"
+                sim_link = f"{settings.SIM_BASE_URL}/phish/{token.token}"
                 msg = body.replace("{{link}}", sim_link)
                 if send_sms(phone, msg):
                     target.sms_sent = True
@@ -338,7 +347,7 @@ async def start_campaign(db: AsyncSession, campaign: Campaign) -> Campaign:
                 if not phone:
                     logger.warning(f"Skipping WhatsApp for target {target.email}: no phone_number")
                     continue
-                sim_link = f"{settings.SIM_BASE_URL}/sim/{token.token}"
+                sim_link = f"{settings.SIM_BASE_URL}/phish/{token.token}"
                 msg = body.replace("{{link}}", sim_link)
                 if send_whatsapp(phone, msg):
                     target.whatsapp_sent = True
@@ -431,7 +440,7 @@ async def generate_whatsapp_link(
         db.add(token)
         await db.flush()
 
-    sim_link = f"{settings.SIM_BASE_URL}/sim/{token.token}"
+    sim_link = f"{settings.SIM_BASE_URL}/phish/{token.token}"
 
     # 3. Construct Message
     body = await _get_message_body(db, campaign, campaign.template_id, ChannelType.WHATSAPP,

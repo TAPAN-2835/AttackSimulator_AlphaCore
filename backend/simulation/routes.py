@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, Response, RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,7 +20,8 @@ from simulation.credential_pages import (
 from simulation.malware_simulation import generate_dummy_file
 
 settings = get_settings()
-router = APIRouter()
+router = APIRouter()  # This will be the sim_router
+phish_router = APIRouter()
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -44,10 +45,67 @@ async def _mark_target_flag(db: AsyncSession, campaign_id: int, email: str, fiel
             CampaignTarget.email == email,
         )
     )
-    target = result.scalar_one_or_none()
+    target = result.scalars().first()
     if target:
         setattr(target, field, True)
         db.add(target)
+
+
+async def log_phish_event(
+    db: AsyncSession,
+    token_obj: SimulationToken,
+    event_type: EventType,
+    request: Request,
+    metadata: dict | None = None
+):
+    """
+    Centralized event logging for phishing events.
+    """
+    if metadata is None:
+        metadata = {}
+    
+    metadata.update({
+        "token": token_obj.token,
+        "target_email": token_obj.target_email
+    })
+
+    await log_event(
+        db=db,
+        event_type=event_type,
+        request=request,
+        user_id=token_obj.user_id,
+        campaign_id=token_obj.campaign_id,
+        metadata=metadata,
+    )
+
+    result = await db.execute(
+        select(CampaignTarget).where(
+            CampaignTarget.campaign_id == token_obj.campaign_id,
+            CampaignTarget.email == token_obj.target_email,
+        )
+    )
+    target = result.scalars().first()
+    if target:
+        if event_type == EventType.EMAIL_OPEN:
+            target.email_opened = True
+        elif event_type == EventType.LINK_CLICK:
+            target.link_clicked = True
+        elif event_type == EventType.CREDENTIAL_ATTEMPT:
+            target.credential_attempt = True
+        elif event_type == EventType.FILE_DOWNLOAD:
+            target.file_download = True
+        db.add(target)
+
+    if token_obj.user_id:
+        from analytics.risk_engine import compute_and_save_risk
+        try:
+            await compute_and_save_risk(db, token_obj.user_id)
+        except Exception as e:
+            # Prevent 500 errors if risk scoring database is out of sync or fails
+            import logging
+            logging.getLogger(__name__).error(f"Risk computation failed for user {token_obj.user_id}: {e}")
+    
+    await db.commit()
 
 
 # ── Routes ─────────────────────────────────────────────────────────────────────
@@ -75,7 +133,7 @@ async def track_link_click(
                 CampaignTarget.campaign_id == campaign_id,
             )
         )
-        target = t_res.scalar_one_or_none()
+        target = t_res.scalars().first()
     elif user_id is not None:
         u_res = await db.execute(
             select(CampaignTarget).where(
@@ -83,7 +141,7 @@ async def track_link_click(
                 CampaignTarget.campaign_id == campaign_id,
             )
         )
-        target = u_res.scalar_one_or_none()
+        target = u_res.scalars().first()
 
     if not target:
         raise HTTPException(status_code=404, detail="Target not found")
@@ -98,10 +156,10 @@ async def track_link_click(
     if campaign.attack_type.value == "malware_download":
         from fastapi.responses import RedirectResponse
         return RedirectResponse(
-            url=f"{settings.SIM_BASE_URL}/sim/download?target_id={target.id}&campaign_id={campaign_id}"
+            url=f"/sim/download?target_id={target.id}&campaign_id={campaign_id}"
         )
 
-    action_url = f"{settings.SIM_BASE_URL}/sim/credential"
+    action_url = "/sim/credential"
     uid = user_id_resolved if user_id_resolved is not None else target.id
     if uid % 2 == 0:
         html = microsoft_login_page(uid, campaign_id, action_url, target_id=target.id)
@@ -133,14 +191,14 @@ async def credential_submit(
             CampaignTarget.id == target_id,
             CampaignTarget.campaign_id == campaign_id,
         ))
-        target = t_res.scalar_one_or_none()
+        target = t_res.scalars().first()
     else:
         user_id = int(user_id_raw)
         u_res = await db.execute(select(CampaignTarget).where(
             CampaignTarget.user_id == user_id,
             CampaignTarget.campaign_id == campaign_id,
         ))
-        target = u_res.scalar_one_or_none()
+        target = u_res.scalars().first()
     if not target:
         raise HTTPException(status_code=404, detail="Target not found")
     user_id = target.user_id
@@ -160,15 +218,9 @@ async def credential_submit(
     if user_id is not None:
         await compute_and_save_risk(db, user_id)
     await db.commit()
-    c_res = await db.execute(select(Campaign).where(Campaign.id == campaign_id))
-    campaign = c_res.scalar_one_or_none()
-    campaign_name = campaign.name if campaign else "Simulation"
     from fastapi.responses import RedirectResponse
-    frontend_url = "http://localhost:5173"
-    return RedirectResponse(
-        url=f"{frontend_url}/training?campaign={campaign_name}&user_id={user_id or ''}&campaign_id={campaign_id}",
-        status_code=303
-    )
+    # Redirect into backend-hosted awareness page after credential submission
+    return RedirectResponse(url="/sim/awareness", status_code=303)
 
 
 @router.get("/download")
@@ -190,7 +242,7 @@ async def malware_download(
             CampaignTarget.id == target_id,
             CampaignTarget.campaign_id == campaign_id,
         ))
-        target = t_res.scalar_one_or_none()
+        target = t_res.scalars().first()
     else:
         if user_id is None:
             raise HTTPException(status_code=400, detail="user_id or target_id required")
@@ -198,7 +250,7 @@ async def malware_download(
             CampaignTarget.user_id == user_id,
             CampaignTarget.campaign_id == campaign_id,
         ))
-        target = u_res.scalar_one_or_none()
+        target = u_res.scalars().first()
     if not target:
         raise HTTPException(status_code=404, detail="Target not found")
 
@@ -261,7 +313,7 @@ async def report_phish(
             CampaignTarget.campaign_id == campaign_id,
         )
     )
-    target = u_res.scalar_one_or_none()
+    target = u_res.scalars().first()
     if target:
         target.reported = True
         db.add(target)
@@ -333,7 +385,7 @@ async def track_email_open(
             CampaignTarget.campaign_id == campaign_id,
         )
     )
-    target = u_res.scalar_one_or_none()
+    target = u_res.scalars().first()
     if target:
         target.email_opened = True
         db.add(target)
@@ -351,38 +403,114 @@ async def track_email_open(
     )
 
 
-@router.get("/{token}", response_class=HTMLResponse)
-async def sim_token_redirect(
-    request: Request,
+@phish_router.get("/phish/{token}", response_class=HTMLResponse)
+async def central_phish_handler(
     token: str,
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """
-    Unique tracking link: /sim/{token}. Validates token, logs LINK_CLICK, redirects to phishing page.
+    Central phishing handler: /phish/{token}. Validates token, identifies attack_type, and routes correctly.
     """
     sim_token = await _get_valid_token(token, db)
-    target_result = await db.execute(
-        select(CampaignTarget).where(
-            CampaignTarget.campaign_id == sim_token.campaign_id,
-            CampaignTarget.email == sim_token.target_email,
+    
+    # Identify attack_type from campaign
+    from campaigns.models import Campaign, AttackType
+    campaign = await db.get(Campaign, sim_token.campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    # Log internal event
+    await log_phish_event(db, sim_token, EventType.LINK_CLICK, request)
+
+    # 1. Credential Phishing
+    if campaign.attack_type == AttackType.credential_harvest:
+        action_url = "/phish/submit"
+        uid = sim_token.user_id if sim_token.user_id is not None else 0
+        if uid % 2 == 0:
+            html = microsoft_login_page(sim_token.user_id, campaign.id, action_url, token=token)
+        else:
+            html = corporate_login_page(sim_token.user_id, campaign.id, action_url, token=token)
+        return HTMLResponse(content=html)
+
+    # 2. Link Phishing (Awareness)
+    elif campaign.attack_type in [AttackType.phishing, AttackType.spear_phishing, AttackType.phishing_link_message]:
+        if campaign.landing_page_url:
+            return RedirectResponse(
+                url=campaign.landing_page_url,
+                status_code=303
+            )
+        return RedirectResponse(
+            url=f"/sim/awareness?token={token}",
+            status_code=303
         )
-    )
-    target = target_result.scalar_one_or_none()
-    if not target:
-        raise HTTPException(status_code=404, detail="Target not found")
 
-    await log_event(
-        db=db,
-        event_type=EventType.LINK_CLICK,
-        request=request,
-        user_id=sim_token.user_id,
-        campaign_id=sim_token.campaign_id,
-        metadata={"email": sim_token.target_email},
-    )
-    target.link_clicked = True
-    db.add(target)
-    await db.commit()
+    # 3. Attachment/Malware Phishing
+    elif campaign.attack_type == AttackType.malware_download:
+        # Note: In real malware sims we might log "FILE_DOWNLOAD" here if the click implies opening
+        # But per requirements Task 2: log "attachment_opened"
+        await log_phish_event(db, sim_token, EventType.FILE_DOWNLOAD, request)
+        return RedirectResponse(
+            url=f"/sim/awareness?token={token}",
+            status_code=303
+        )
 
-    from fastapi.responses import RedirectResponse
-    redirect_url = f"{settings.SIM_BASE_URL}/sim/track?target_id={target.id}&campaign_id={sim_token.campaign_id}"
-    return RedirectResponse(url=redirect_url, status_code=302)
+    # Default fallback
+    return RedirectResponse(url=f"/sim/awareness?token={token}", status_code=303)
+
+
+@phish_router.post("/phish/submit")
+async def central_credential_submission(
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """
+    Centralized credential submission handler.
+    1. receive token
+    2. validate token
+    3. log event "credentials_submitted"
+    4. redirect to awareness page
+    """
+    form = await request.form()
+    token = form.get("token") or form.get("token_raw")
+    
+    if not token:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Credential submission received without token. Form keys: {list(form.keys())}. Falling back to old handler.")
+        # Fallback to old behavior if token missing (for transition)
+        return await credential_submit(request, db)
+
+    sim_token = await _get_valid_token(token, db)
+    
+    await log_phish_event(
+        db,
+        sim_token,
+        EventType.CREDENTIAL_ATTEMPT,
+        request,
+        metadata={"username_provided": form.get("username", ""), "password_stored": False}
+    )
+
+    return RedirectResponse(
+        url=f"/sim/awareness?token={token}",
+        status_code=303
+    )
+
+
+@router.get("/awareness", response_class=HTMLResponse)
+async def sim_awareness_page(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    token: str | None = Query(None)
+) -> HTMLResponse:
+    """
+    Universal security awareness landing page shown after simulations.
+    Validates token if provided.
+    """
+    campaign_name = None
+    if token:
+        sim_token = await _get_valid_token(token, db)
+        campaign = await db.get(Campaign, sim_token.campaign_id)
+        if campaign:
+            campaign_name = campaign.name
+
+    return HTMLResponse(content=awareness_page(campaign_name=campaign_name))

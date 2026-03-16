@@ -1,13 +1,22 @@
 import { useEffect, useState } from "react";
-import { Target, Users, MousePointerClick, KeyRound, Bug, ShieldCheck, Brain, Sparkles } from "lucide-react";
+import { Target, Users, MousePointerClick, KeyRound, Bug, ShieldCheck, Brain, Sparkles, AlertTriangle } from "lucide-react";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import StatCard from "@/components/StatCard";
 import LiveFeed from "@/components/LiveFeed";
 import GlassCard from "@/components/GlassCard";
-import VirusTotalCheck from "@/components/VirusTotalCheck";
 import {
-  fetchAdminDashboard, fetchAnalyticsDashboard, fetchRecentEvents, fetchUsers, fetchCampaignTrend,
-  type DashboardOverview, type AnalyticsOverview, type EventOut, type UserWithRisk, type TrendPoint
+  fetchAdminDashboard,
+  fetchAnalyticsDashboard,
+  fetchRecentEvents,
+  fetchUsers,
+  fetchCampaignTrend,
+  fetchAiInsights,
+  type DashboardOverview,
+  type AnalyticsOverview,
+  type EventOut,
+  type UserWithRisk,
+  type TrendPoint,
+  type AiInsightsResponse,
 } from "@/lib/api";
 
 const Dashboard = () => {
@@ -16,21 +25,24 @@ const Dashboard = () => {
   const [highRiskUsers, setHighRiskUsers] = useState<UserWithRisk[]>([]);
   const [events, setEvents] = useState<EventOut[]>([]);
   const [trends, setTrends] = useState<TrendPoint[]>([]);
+  const [aiInsights, setAiInsights] = useState<string[]>([]);
 
   const refreshData = async () => {
     try {
-      const [ov, an, evs, urs, tr] = await Promise.all([
+      const [ov, an, evs, urs, tr, ai] = await Promise.all([
         fetchAdminDashboard(),
         fetchAnalyticsDashboard(),
         fetchRecentEvents(15),
         fetchUsers(),
-        fetchCampaignTrend()
+        fetchCampaignTrend(),
+        fetchAiInsights(),
       ]);
       setOverview(ov);
       setAnalytics(an);
       setEvents(evs);
       setTrends(tr);
-      
+      setAiInsights(ai.insights ?? []);
+
       const sorted = urs
         .filter((u) => u.risk_score !== null)
         .sort((a, b) => (b.risk_score ?? 0) - (a.risk_score ?? 0))
@@ -128,20 +140,28 @@ const Dashboard = () => {
             <h3 className="text-sm font-semibold font-display mb-4 flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-primary" /> AI Security Insights
             </h3>
-            <div className="space-y-4">
-              {[
-                { text: "Finance dept requires phishing training due to 30% click spike.", type: "warning" },
-                { text: "High credential submission detected in Marketing team.", type: "danger" },
-                { text: "Attachment-based attacks successful in HR; suggest drills.", type: "info" }
-              ].map((insight, i) => (
-                <div key={i} className="text-xs p-3 rounded-lg bg-muted/40 border-l-2 border-primary border-opacity-50">
-                  {insight.text}
-                </div>
-              ))}
-            </div>
+            {aiInsights.length === 0 ? (
+              <div className="text-xs text-muted-foreground p-3 rounded-lg bg-muted/40 border border-dashed border-border">
+                No security insights available yet. Run campaigns and collect events to see AI-driven summaries here.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {aiInsights.map((text, i) => (
+                  <div
+                    key={i}
+                    className="flex items-start gap-3 p-3 rounded-lg bg-muted/40 border border-border/70 shadow-sm"
+                  >
+                    <div className="mt-0.5 text-amber-500">
+                      <AlertTriangle className="h-4 w-4" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-foreground">{text}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </GlassCard>
-
-          <VirusTotalCheck compact title="Check link with VirusTotal" glow="cyan" />
 
           <GlassCard glow="purple" className="p-5">
             <h3 className="text-sm font-semibold font-display mb-4 flex items-center gap-2">

@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     TOKEN_EXPIRY_HOURS: int = 72
     SIMULATION_MODE: bool = True  # When True: log messages only, no real SMS/WhatsApp sent
 
+    # Public base URL for links in outbound emails (deployed backend domain)
+    # Example: https://your-deployed-domain.com
+    BASE_URL: str = "http://localhost:8000"
+
     # Twilio (optional — for real SMS/WhatsApp when SIMULATION_MODE=False)
     TWILIO_ACCOUNT_SID: str = ""
     TWILIO_AUTH_TOKEN: str = ""
@@ -58,3 +62,14 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+@lru_cache
+def get_base_url() -> str:
+    """
+    Public-facing base URL used in phishing links and tracking pixels.
+    Falls back to SIM_BASE_URL for local development.
+    """
+    settings = get_settings()
+    return (getattr(settings, "BASE_URL", "") or settings.SIM_BASE_URL).rstrip("/")
+

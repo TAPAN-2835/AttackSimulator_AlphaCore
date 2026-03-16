@@ -1,17 +1,23 @@
+from datetime import datetime
+from io import BytesIO
 from typing import Annotated
-
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi.responses import HTMLResponse, StreamingResponse
+from jinja2 import Template
+from xhtml2pdf import pisa
 from pydantic import BaseModel
-from sqlalchemy import select, func
+from sqlalchemy import select, func, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from analytics.models import RiskScore, RiskLevel
 from analytics.risk_engine import compute_and_save_risk, get_event_counts_for_user
 from auth.models import User, UserRole
-from campaigns.models import CampaignTarget, Campaign
+from auth.service import CurrentUser
+from campaigns.models import CampaignTarget, Campaign, AttackType
 from campaigns.models import ChannelType
 from events.models import Event, EventType
 from database import get_db
+from utils.report_templates import REPORT_TEMPLATE
 
 router = APIRouter()
 
@@ -79,6 +85,15 @@ class UserRiskListEntry(BaseModel):
 class UserRiskListResponse(BaseModel):
     users: list[UserRiskListEntry]
     distribution: dict[str, int]
+
+
+class LatestFeedbackResponse(BaseModel):
+    campaign_name: str
+    attack_type: AttackType
+    link_clicked: bool
+    credential_attempt: bool
+    file_download: bool
+    attack_indicators: list[str] = []
 
 
 # ── Routes ─────────────────────────────────────────────────────────────
@@ -308,6 +323,40 @@ async def get_employee_score(
     )
 
 
+@router.get("/latest-feedback", response_model=LatestFeedbackResponse | None)
+async def get_latest_feedback(
+    current_user: Annotated[User, Depends(CurrentUser)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Fetch the most recent simulation interaction details for the logged-in employee."""
+    from campaigns.models import CampaignTarget, Campaign
+    
+    stmt = (
+        select(CampaignTarget, Campaign.name, Campaign.attack_indicators, Campaign.attack_type)
+        .join(Campaign, CampaignTarget.campaign_id == Campaign.id)
+        .where(CampaignTarget.user_id == current_user.id)
+        .order_by(CampaignTarget.id.desc())
+        .limit(1)
+    )
+    
+    result = await db.execute(stmt)
+    row = result.fetchone()
+    
+    if not row:
+        return None
+        
+    target, camp_name, indicators, attack_type = row
+    
+    return LatestFeedbackResponse(
+        campaign_name=camp_name,
+        attack_type=attack_type,
+        link_clicked=target.link_clicked,
+        credential_attempt=target.credential_attempt,
+        file_download=target.file_download,
+        attack_indicators=indicators if indicators else []
+    )
+
+
 @router.get("/users", response_model=UserRiskListResponse)
 async def get_all_users_risk(db: Annotated[AsyncSession, Depends(get_db)]):
     """
@@ -425,4 +474,247 @@ async def channel_performance(db: Annotated[AsyncSession, Depends(get_db)]):
         email_campaigns=email_campaigns,
         sms_campaigns=sms_campaigns,
         whatsapp_campaigns=whatsapp_campaigns,
+    )
+
+
+# ── AI Security Insights ───────────────────────────────────────────────
+
+
+class AiInsightsResponse(BaseModel):
+    insights: list[str]
+
+
+@router.get("/ai-insights", response_model=AiInsightsResponse)
+async def ai_insights(db: Annotated[AsyncSession, Depends(get_db)]) -> AiInsightsResponse:
+    """
+    Generate simple, human-readable security insights from existing analytics data.
+    This is lightweight and only uses aggregate queries on existing tables.
+    """
+    insights: list[str] = []
+
+    # 1) Department with highest phishing click rate
+    dept_rows = await db.execute(
+        select(
+            CampaignTarget.department,
+            func.count().label("total"),
+            func.sum(
+                case(
+                    (CampaignTarget.link_clicked == True, 1),
+                    else_=0,
+                )
+            ).label("clicked"),
+        )
+        .where(CampaignTarget.department.isnot(None))
+        .group_by(CampaignTarget.department)
+    )
+    top_dept = None
+    top_rate = 0.0
+    for row in dept_rows:
+        total = row.total or 0
+        clicked = row.clicked or 0
+        if total == 0:
+            continue
+        rate = round(clicked / total * 100, 1)
+        if rate > top_rate:
+            top_rate = rate
+            top_dept = row.department
+    if top_dept and top_rate > 0:
+        insights.append(
+            f"{top_dept} department shows the highest phishing click rate at {top_rate}%."
+        )
+
+    # 2) Total credential submissions
+    total_creds = (
+        await db.execute(
+            select(func.count())
+            .select_from(Event)
+            .where(Event.event_type == EventType.CREDENTIAL_ATTEMPT)
+        )
+    ).scalar_one() or 0
+    if total_creds > 0:
+        insights.append(
+            f"{total_creds} credential submission attempts have been detected across all campaigns."
+        )
+
+    # 3) Most frequently targeted department (by number of campaign targets)
+    most_targeted = await db.execute(
+        select(
+            CampaignTarget.department,
+            func.count().label("cnt"),
+        )
+        .where(CampaignTarget.department.isnot(None))
+        .group_by(CampaignTarget.department)
+        .order_by(func.count().desc())
+        .limit(1)
+    )
+    row = most_targeted.fetchone()
+    if row and row.department:
+        insights.append(
+            f"{row.department} department is currently the most frequently targeted in simulations."
+        )
+
+    # 4) Malware download simulations
+    malware_downloads = (
+        await db.execute(
+            select(func.count())
+            .select_from(Event)
+            .where(Event.event_type == EventType.FILE_DOWNLOAD)
+        )
+    ).scalar_one() or 0
+    if malware_downloads > 0:
+        insights.append(
+            f"{malware_downloads} simulated malware download events have been triggered by employees."
+        )
+
+    # 5) Overall campaign click-through rate
+    total_targets = (
+        await db.execute(select(func.count()).select_from(CampaignTarget))
+    ).scalar_one() or 0
+    total_clicks = (
+        await db.execute(
+            select(func.count())
+            .select_from(CampaignTarget)
+            .where(CampaignTarget.link_clicked == True)
+        )
+    ).scalar_one() or 0
+    if total_targets > 0:
+        ctr = round(total_clicks / total_targets * 100, 1)
+        insights.append(
+            f"Overall campaign click-through rate is {ctr}% across all simulations."
+        )
+
+    if not insights:
+        # Fallback to avoid empty list, frontend will still show a friendly message
+        return AiInsightsResponse(insights=[])
+
+    return AiInsightsResponse(insights=insights)
+
+
+@router.get("/export-report")
+async def export_security_report(db: AsyncSession = Depends(get_db)):
+    # 1. Gather Global Metrics
+    total_targets = (await db.execute(select(func.count()).select_from(CampaignTarget))).scalar_one() or 1
+    
+    def count_attr(attr):
+        return select(func.count()).select_from(CampaignTarget).where(attr == True)
+
+    clicks = (await db.execute(count_attr(CampaignTarget.link_clicked))).scalar_one() or 0
+    creds = (await db.execute(count_attr(CampaignTarget.credential_attempt))).scalar_one() or 0
+    downloads = (await db.execute(count_attr(CampaignTarget.file_download))).scalar_one() or 0
+    reported = (await db.execute(count_attr(CampaignTarget.reported))).scalar_one() or 0
+
+    click_rate = round(clicks / total_targets * 100, 1)
+    cred_rate = round(creds / total_targets * 100, 1)
+    down_rate = round(downloads / total_targets * 100, 1)
+    rep_rate = round(reported / total_targets * 100, 1)
+
+    # 2. Gather Departmental Data
+    dept_rows = await db.execute(
+        select(
+            CampaignTarget.department,
+            func.count().label("total"),
+            func.sum(case((CampaignTarget.link_clicked == True, 1), else_=0)).label("clicked"),
+            func.sum(case((CampaignTarget.credential_attempt == True, 1), else_=0)).label("creds"),
+        )
+        .where(CampaignTarget.department.isnot(None))
+        .group_by(CampaignTarget.department)
+    )
+
+    departments = []
+    for row in dept_rows:
+        d_total = row.total or 1
+        d_click = round((row.clicked or 0) / d_total * 100, 1)
+        d_cred = round((row.creds or 0) / d_total * 100, 1)
+        
+        risk_l = "Low"
+        if d_click > 50 or d_cred > 20: risk_l = "Critical"
+        elif d_click > 30 or d_cred > 10: risk_l = "High"
+        elif d_click > 15: risk_l = "Medium"
+        
+        departments.append({
+            "name": row.department,
+            "total": d_total,
+            "click_rate": d_click,
+            "credential_rate": d_cred,
+            "risk_level": risk_l
+        })
+
+    # 3. Risk Distribution
+    users_with_risk = await get_all_users_risk(db)
+    distribution_list = []
+    total_users = len(users_with_risk.users) or 1
+    for level, count in users_with_risk.distribution.items():
+        distribution_list.append({
+            "level": level,
+            "count": count,
+            "percentage": round(count / total_users * 100, 1)
+        })
+
+    # 4. Top Vulnerable Users
+    top_users_list = sorted(users_with_risk.users, key=lambda x: x.risk_score, reverse=True)[:10]
+
+    # 5. Channel Performance
+    channel_perf = await channel_performance(db)
+    
+    # Helper to get sent/clicked counts for specific channels since channel_performance doesn't return raw counts in the model
+    # We'll just calculate rates from the response for now
+    channels = [
+        {"type": "Email", "sent": "N/A", "clicks": "N/A", "rate": channel_perf.email_click_rate},
+        {"type": "SMS", "sent": "N/A", "clicks": "N/A", "rate": channel_perf.sms_click_rate},
+        {"type": "WhatsApp", "sent": "N/A", "clicks": "N/A", "rate": channel_perf.whatsapp_click_rate},
+    ]
+
+    # 6. AI Insights
+    insight_response = await ai_insights(db)
+    insights = insight_response.insights
+
+    # 7. Generate Remedies
+    remedies = []
+    if click_rate > 15:
+        remedies.append({
+            "title": "Quarterly Social Engineering Drills",
+            "description": f"Organizational click rate ({click_rate}%) exceeds threshold. Implement mandatory quarterly simulations."
+        })
+    if cred_rate > 3:
+        remedies.append({
+            "title": "Phishing-Resistant MFA (MFA Hardening)",
+            "description": f"High credential submission rate ({cred_rate}%). Prioritize transition to FIDO2/WebAuthn keys."
+        })
+    if rep_rate < 50:
+        remedies.append({
+            "title": "Positive Reinforcement Reporting Culture",
+            "description": "Lower than ideal reporting rate. Reward employees who report simulations with public recognition."
+        })
+    
+    if not remedies:
+        remedies.append({
+            "title": "Advanced Threat Intelligence Briefings",
+            "description": "Current performance is excellent. We recommend advanced briefings for technical leadership."
+        })
+
+    # 8. Render Template
+    template = Template(REPORT_TEMPLATE)
+    html_content = template.render(
+        date=datetime.now().strftime("%B %d, %Y"),
+        click_rate=click_rate,
+        credential_rate=cred_rate,
+        download_rate=down_rate,
+        report_rate=rep_rate,
+        departments=departments,
+        distribution=distribution_list,
+        top_users=top_users_list,
+        channels=channels,
+        insights=insights,
+        remedies=remedies
+    )
+
+    # 6. Convert HTML to PDF
+    pdf_result = BytesIO()
+    pisa.pisaDocument(BytesIO(html_content.encode("UTF-8")), pdf_result)
+    pdf_result.seek(0)
+
+    return StreamingResponse(
+        pdf_result, 
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=Security_Report_{datetime.now().strftime('%Y%m%d')}.pdf"}
     )
