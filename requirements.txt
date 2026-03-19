@@ -38,4 +38,5 @@ twilio>=9.0.0
 # groq>=0.4.0
 # chromadb>=0.4.0
 # sentence-transformers>=2.2.0
-xhtml2pdf>=0.2.14
+xhtml2pdf==0.2.11
+python-bidi==0.4.2
