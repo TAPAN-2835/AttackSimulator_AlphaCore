@@ -1,4 +1,4 @@
-export type ChannelKey = "EMAIL" | "SMS" | "WHATSAPP";
+export type ChannelKey = "EMAIL" | "SMS" | "WHATSAPP" | "TELEGRAM" | "INSTAGRAM" | "LINKEDIN";
 
 export interface AttackOption {
   value: string; // backend AttackType enum value
@@ -34,6 +34,18 @@ export const attackOptionsByChannel: Record<ChannelKey, AttackOption[]> = {
     { value: "vishing_voice_file", label: "Vishing Voice File" },
     { value: "payment_request_scam", label: "Payment Request Scam" },
   ],
+  TELEGRAM: [
+    { value: "phishing_link_message", label: "Phishing Link Message" },
+    { value: "fake_support_message", label: "Fake Support Message" },
+  ],
+  INSTAGRAM: [
+    { value: "phishing_link_message", label: "Phishing Link Message" },
+    { value: "fake_support_message", label: "Fake Support Message" },
+  ],
+  LINKEDIN: [
+    { value: "phishing_link_message", label: "Phishing Link Message" },
+    { value: "fake_support_message", label: "Fake Support Message" },
+  ],
 };
 
 // Simple label-only mapping kept for convenience / spec compatibility.
@@ -41,5 +53,8 @@ export const attackChannels = {
   email: attackOptionsByChannel.EMAIL.map((o) => o.label),
   sms: attackOptionsByChannel.SMS.map((o) => o.label),
   whatsapp: attackOptionsByChannel.WHATSAPP.map((o) => o.label),
+  telegram: attackOptionsByChannel.TELEGRAM.map((o) => o.label),
+  instagram: attackOptionsByChannel.INSTAGRAM.map((o) => o.label),
+  linkedin: attackOptionsByChannel.LINKEDIN.map((o) => o.label),
 } as const;
 

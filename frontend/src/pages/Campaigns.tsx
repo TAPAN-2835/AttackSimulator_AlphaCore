@@ -13,7 +13,7 @@ import {
   DialogTitle, 
   DialogDescription,
 } from "@/components/ui/dialog";
-import { fetchCampaigns, createCampaign, fetchDepartments, generateAIEmail, clearAllCampaigns, fetchCampaignDetail, fetchWhatsAppLink, type CampaignOut, type CampaignDetail, type TargetOut } from "@/lib/api";
+import { fetchCampaigns, createCampaign, fetchDepartments, generateAIEmail, clearAllCampaigns, fetchCampaignDetail, fetchWhatsAppLink, fetchTelegramLink, fetchInstagramLink, fetchLinkedInLink, type CampaignOut, type CampaignDetail, type TargetOut } from "@/lib/api";
 import { toast } from "sonner";
 import { attackOptionsByChannel, type ChannelKey } from "@/config/attackChannels";
 
@@ -245,6 +245,45 @@ const Campaigns = () => {
     }
   };
 
+  const handleSendTelegram = async (campaignId: number, target: TargetOut) => {
+    setIsLinking(true);
+    try {
+      const { telegram_link } = await fetchTelegramLink(campaignId, target.id);
+      window.open(telegram_link, "_blank");
+      toast.success(`Telegram message prepared for ${target.name || target.email}`);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to generate Telegram link");
+    } finally {
+      setIsLinking(false);
+    }
+  };
+
+  const handleSendInstagram = async (campaignId: number, target: TargetOut) => {
+    setIsLinking(true);
+    try {
+      const { instagram_link } = await fetchInstagramLink(campaignId, target.id);
+      window.open(instagram_link, "_blank");
+      toast.success(`Instagram message prepared for ${target.name || target.email}`);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to generate Instagram link");
+    } finally {
+      setIsLinking(false);
+    }
+  };
+
+  const handleSendLinkedIn = async (campaignId: number, target: TargetOut) => {
+    setIsLinking(true);
+    try {
+      const { linkedin_link } = await fetchLinkedInLink(campaignId, target.id);
+      window.open(linkedin_link, "_blank");
+      toast.success(`LinkedIn message prepared for ${target.name || target.email}`);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to generate LinkedIn link");
+    } finally {
+      setIsLinking(false);
+    }
+  };
+
   const rows = campaigns.map((c) => ({
     key: String(c.id), name: c.name,
     channel: c.channel_type || "EMAIL",
@@ -278,16 +317,20 @@ const Campaigns = () => {
         setGeneratedQRUrl(`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(simUrl)}`);
       }
 
-      if (directChannel === "WHATSAPP") {
-          toast.success("Direct attack created! Preparing WhatsApp link...");
-          // Need to fetch details to get the target.id
+      if (["WHATSAPP", "TELEGRAM", "INSTAGRAM", "LINKEDIN"].includes(directChannel)) {
+          toast.success(`Direct attack created! Preparing ${directChannel} link...`);
           const detail = await fetchCampaignDetail(newCampaign.id);
           const target = detail.targets[0];
           if (target) {
-             const { whatsapp_link } = await fetchWhatsAppLink(newCampaign.id, target.id);
-             window.open(whatsapp_link, "_blank");
+             let link = "";
+             if (directChannel === "WHATSAPP") link = (await fetchWhatsAppLink(newCampaign.id, target.id)).whatsapp_link;
+             else if (directChannel === "TELEGRAM") link = (await fetchTelegramLink(newCampaign.id, target.id)).telegram_link;
+             else if (directChannel === "INSTAGRAM") link = (await fetchInstagramLink(newCampaign.id, target.id)).instagram_link;
+             else if (directChannel === "LINKEDIN") link = (await fetchLinkedInLink(newCampaign.id, target.id)).linkedin_link;
+             
+             if (link) window.open(link, "_blank");
           } else {
-             toast.info("WhatsApp link couldn't be auto-opened. Please check campaign targets.");
+             toast.info("Outreach link couldn't be auto-opened. Please check campaign targets.");
           }
       } else {
           toast.success("Direct attack launched!");
@@ -383,6 +426,9 @@ const Campaigns = () => {
                 <option value="EMAIL">Email</option>
                 <option value="SMS">SMS</option>
                 <option value="WHATSAPP">WhatsApp</option>
+                <option value="TELEGRAM">Telegram</option>
+                <option value="INSTAGRAM">Instagram</option>
+                <option value="LINKEDIN">LinkedIn</option>
               </select>
             </div>
             <div>
@@ -475,6 +521,9 @@ const Campaigns = () => {
                 <option value="EMAIL">Email</option>
                 <option value="SMS">SMS</option>
                 <option value="WHATSAPP">WhatsApp</option>
+                <option value="TELEGRAM">Telegram</option>
+                <option value="INSTAGRAM">Instagram</option>
+                <option value="LINKEDIN">LinkedIn</option>
               </select>
             </div>
             <div>
@@ -546,6 +595,9 @@ const Campaigns = () => {
                 <option value="EMAIL">Email</option>
                 <option value="SMS">SMS</option>
                 <option value="WHATSAPP">WhatsApp</option>
+                <option value="TELEGRAM">Telegram</option>
+                <option value="INSTAGRAM">Instagram</option>
+                <option value="LINKEDIN">LinkedIn</option>
               </select>
             </div>
             <div>
@@ -736,7 +788,10 @@ const Campaigns = () => {
                         {t.email_sent && <span className="text-[10px] text-green-500 flex items-center gap-1">• Email Sent</span>}
                         {t.sms_sent && <span className="text-[10px] text-green-500 flex items-center gap-1">• SMS Sent</span>}
                         {t.whatsapp_sent && <span className="text-[10px] text-green-500 flex items-center gap-1">• WA Sent</span>}
-                        {!t.email_sent && !t.sms_sent && !t.whatsapp_sent && <span className="text-[10px] text-orange-500 flex items-center gap-1">• Pending</span>}
+                        {t.telegram_sent && <span className="text-[10px] text-green-500 flex items-center gap-1">• TG Sent</span>}
+                        {t.instagram_sent && <span className="text-[10px] text-green-500 flex items-center gap-1">• IG Sent</span>}
+                        {t.linkedin_sent && <span className="text-[10px] text-green-500 flex items-center gap-1">• LI Sent</span>}
+                        {!t.email_sent && !t.sms_sent && !t.whatsapp_sent && !t.telegram_sent && !t.instagram_sent && !t.linkedin_sent && <span className="text-[10px] text-orange-500 flex items-center gap-1">• Pending</span>}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -747,16 +802,48 @@ const Campaigns = () => {
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      <GlowButton 
-                        size="sm" 
-                        glowColor="cyan" 
-                        className="h-8 bg-green-500/10 hover:bg-green-500/20 text-green-600 border-green-500/20 dark:text-green-400"
-                        onClick={() => handleSendWhatsApp(selectedCampaign.id, t)}
-                        disabled={isLinking}
-                      >
-                        <MessageCircle className="h-4 w-4 mr-1" />
-                        WA
-                      </GlowButton>
+                      <div className="flex justify-end gap-1">
+                        <GlowButton 
+                          size="sm" 
+                          glowColor="cyan" 
+                          className="h-8 bg-green-500/10 hover:bg-green-500/20 text-green-600 border-green-500/20 dark:text-green-400 px-2"
+                          onClick={() => handleSendWhatsApp(selectedCampaign.id, t)}
+                          disabled={isLinking}
+                        >
+                          <MessageCircle className="h-4 w-4 mr-1" />
+                          WA
+                        </GlowButton>
+                        <GlowButton 
+                          size="sm" 
+                          glowColor="blue" 
+                          className="h-8 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 border-blue-500/20 dark:text-blue-400 px-2"
+                          onClick={() => handleSendTelegram(selectedCampaign.id, t)}
+                          disabled={isLinking}
+                        >
+                          <Send className="h-4 w-4 mr-1" />
+                          TG
+                        </GlowButton>
+                        <GlowButton 
+                          size="sm" 
+                          glowColor="purple" 
+                          className="h-8 bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 border-purple-500/20 dark:text-purple-400 px-2"
+                          onClick={() => handleSendInstagram(selectedCampaign.id, t)}
+                          disabled={isLinking}
+                        >
+                          <ExternalLink className="h-4 w-4 mr-1" />
+                          IG
+                        </GlowButton>
+                        <GlowButton 
+                          size="sm" 
+                          glowColor="blue" 
+                          className="h-8 bg-blue-600/10 hover:bg-blue-600/20 text-blue-700 border-blue-600/20 dark:text-blue-400 px-2"
+                          onClick={() => handleSendLinkedIn(selectedCampaign.id, t)}
+                          disabled={isLinking}
+                        >
+                          <ExternalLink className="h-4 w-4 mr-1" />
+                          LI
+                        </GlowButton>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

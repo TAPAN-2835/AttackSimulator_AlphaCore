@@ -46,6 +46,9 @@ class ChannelType(str, enum.Enum):
     EMAIL = "EMAIL"
     SMS = "SMS"
     WHATSAPP = "WHATSAPP"
+    TELEGRAM = "TELEGRAM"
+    INSTAGRAM = "INSTAGRAM"
+    LINKEDIN = "LINKEDIN"
 
 
 class MessageTemplate(Base):
@@ -100,6 +103,9 @@ class CampaignTarget(Base):
     email_sent: Mapped[bool] = mapped_column(Boolean, default=False)
     sms_sent: Mapped[bool] = mapped_column(Boolean, default=False)
     whatsapp_sent: Mapped[bool] = mapped_column(Boolean, default=False)
+    telegram_sent: Mapped[bool] = mapped_column(Boolean, default=False)
+    instagram_sent: Mapped[bool] = mapped_column(Boolean, default=False)
+    linkedin_sent: Mapped[bool] = mapped_column(Boolean, default=False)
     email_opened: Mapped[bool] = mapped_column(Boolean, default=False)
     link_clicked: Mapped[bool] = mapped_column(Boolean, default=False)
     credential_attempt: Mapped[bool] = mapped_column(Boolean, default=False)

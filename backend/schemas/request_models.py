@@ -100,6 +100,9 @@ class TargetOut(BaseModel):
     email_sent: bool
     sms_sent: bool = False
     whatsapp_sent: bool = False
+    telegram_sent: bool = False
+    instagram_sent: bool = False
+    linkedin_sent: bool = False
     email_opened: bool
     link_clicked: bool
     credential_attempt: bool

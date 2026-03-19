@@ -185,20 +185,22 @@ async def credential_submit(
     username = form.get("username", "")
     target_id_raw = form.get("target_id")
     user_id_raw = form.get("user_id")
-    if target_id_raw:
+    
+    target = None
+    if target_id_raw and target_id_raw != "None":
         target_id = int(target_id_raw)
         t_res = await db.execute(select(CampaignTarget).where(
             CampaignTarget.id == target_id,
             CampaignTarget.campaign_id == campaign_id,
         ))
-        target = t_res.scalars().first()
-    else:
+        target = t_res.scalar_one_or_none()
+    elif user_id_raw and user_id_raw != "None":
         user_id = int(user_id_raw)
         u_res = await db.execute(select(CampaignTarget).where(
             CampaignTarget.user_id == user_id,
             CampaignTarget.campaign_id == campaign_id,
         ))
-        target = u_res.scalars().first()
+        target = u_res.scalar_one_or_none()
     if not target:
         raise HTTPException(status_code=404, detail="Target not found")
     user_id = target.user_id

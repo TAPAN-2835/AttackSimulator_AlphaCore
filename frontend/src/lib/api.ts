@@ -156,6 +156,9 @@ export interface TargetOut {
   email_sent: boolean;
   sms_sent: boolean;
   whatsapp_sent: boolean;
+  telegram_sent: boolean;
+  instagram_sent: boolean;
+  linkedin_sent: boolean;
   email_opened: boolean;
   link_clicked: boolean;
   credential_attempt: boolean;
@@ -170,7 +173,7 @@ export interface CampaignDetail extends CampaignOut {
 export interface CampaignCreate {
   campaign_name: string;
   description?: string;
-  channel_type?: "EMAIL" | "SMS" | "WHATSAPP";
+  channel_type?: "EMAIL" | "SMS" | "WHATSAPP" | "TELEGRAM" | "INSTAGRAM" | "LINKEDIN";
   attack_type: string;
   target_group?: string;
   template_id?: number;
@@ -233,6 +236,18 @@ export async function fetchCampaignDetail(campaignId: number): Promise<CampaignD
 
 export async function fetchWhatsAppLink(campaignId: number, targetId: number): Promise<{ whatsapp_link: string }> {
   return apiFetch<{ whatsapp_link: string }>(`/campaigns/${campaignId}/whatsapp-link?target_id=${targetId}`);
+}
+
+export async function fetchTelegramLink(campaignId: number, targetId: number): Promise<{ telegram_link: string }> {
+  return apiFetch<{ telegram_link: string }>(`/campaigns/${campaignId}/telegram-link?target_id=${targetId}`);
+}
+
+export async function fetchInstagramLink(campaignId: number, targetId: number): Promise<{ instagram_link: string }> {
+  return apiFetch<{ instagram_link: string }>(`/campaigns/${campaignId}/instagram-link?target_id=${targetId}`);
+}
+
+export async function fetchLinkedInLink(campaignId: number, targetId: number): Promise<{ linkedin_link: string }> {
+  return apiFetch<{ linkedin_link: string }>(`/campaigns/${campaignId}/linkedin-link?target_id=${targetId}`);
 }
 
 export async function clearAllCampaigns(): Promise<void> {

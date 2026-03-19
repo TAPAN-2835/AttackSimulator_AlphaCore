@@ -1,3 +1,4 @@
+import csv
 import io
 import logging
 import uuid
@@ -53,6 +54,18 @@ VALID_ATTACKS_BY_CHANNEL: dict[ChannelType, set[AttackType]] = {
         AttackType.fake_support_message,
         AttackType.vishing_voice_file,
         AttackType.payment_request_scam,
+    },
+    ChannelType.TELEGRAM: {
+        AttackType.phishing_link_message,
+        AttackType.fake_support_message,
+    },
+    ChannelType.INSTAGRAM: {
+        AttackType.phishing_link_message,
+        AttackType.fake_support_message,
+    },
+    ChannelType.LINKEDIN: {
+        AttackType.phishing_link_message,
+        AttackType.fake_support_message,
     },
 }
 
@@ -387,60 +400,91 @@ async def _get_message_body(
     return default
 
 
+async def generate_telegram_link(db: AsyncSession, campaign_id: int, target_id: int) -> str:
+    campaign, target, phone, email, user_id, token_str = await _prepare_link_data(db, campaign_id, target_id)
+    sim_link = f"{settings.SIM_BASE_URL}/phish/{token_str}"
+    body = await _get_message_body(db, campaign, campaign.template_id, ChannelType.TELEGRAM,
+        default="Security Alert: Your account requires verification. Verify here: {{link}}")
+    message = body.replace("{{link}}", sim_link)
+    
+    clean_phone = "".join(filter(str.isdigit, phone)) if phone else ""
+    encoded_message = urllib.parse.quote(message)
+    # Telegram link can be t.me/phone if phone exists, or just a share link
+    if clean_phone:
+        url = f"https://t.me/+{clean_phone}?text={encoded_message}"
+    else:
+        url = f"https://t.me/share/url?url={urllib.parse.quote(sim_link)}&text={encoded_message}"
+    
+    await log_event(db, EventType.TELEGRAM_LINK_GENERATED, campaign_id=campaign_id, user_id=user_id,
+                    metadata={"phone": phone, "email": email, "target_id": target_id})
+    return url
+
+async def generate_instagram_link(db: AsyncSession, campaign_id: int, target_id: int) -> str:
+    campaign, target, phone, email, user_id, token_str = await _prepare_link_data(db, campaign_id, target_id)
+    sim_link = f"{settings.SIM_BASE_URL}/phish/{token_str}"
+    body = await _get_message_body(db, campaign, campaign.template_id, ChannelType.INSTAGRAM,
+        default="Security Alert: Your account requires verification. Verify here: {{link}}")
+    message = body.replace("{{link}}", sim_link)
+    # Instagram doesn't have a direct "send message" URL with text as easily as WA/TG, 
+    # but we can provide a link to the profile or a general share link.
+    # For simulation purposes, we'll return a direct message intent if possible or just the sim link.
+    url = f"https://www.instagram.com/direct/inbox/" # Best we can do is inbox
+    await log_event(db, EventType.INSTAGRAM_LINK_GENERATED, campaign_id=campaign_id, user_id=user_id,
+                    metadata={"phone": phone, "email": email, "target_id": target_id})
+    return url
+
+async def generate_linkedin_link(db: AsyncSession, campaign_id: int, target_id: int) -> str:
+    campaign, target, phone, email, user_id, token_str = await _prepare_link_data(db, campaign_id, target_id)
+    sim_link = f"{settings.SIM_BASE_URL}/phish/{token_str}"
+    body = await _get_message_body(db, campaign, campaign.template_id, ChannelType.LINKEDIN,
+        default="Security Alert: Your account requires verification. Verify here: {{link}}")
+    message = body.replace("{{link}}", sim_link)
+    
+    encoded_message = urllib.parse.quote(message)
+    # LinkedIn message sharing
+    url = f"https://www.linkedin.com/sharing/share-offsite/?url={urllib.parse.quote(sim_link)}"
+    
+    await log_event(db, EventType.LINKEDIN_LINK_GENERATED, campaign_id=campaign_id, user_id=user_id,
+                    metadata={"phone": phone, "email": email, "target_id": target_id})
+    return url
+
+async def _prepare_link_data(db: AsyncSession, campaign_id: int, target_id: int):
+    from fastapi import HTTPException
+    campaign = await db.get(Campaign, campaign_id)
+    if not campaign: raise HTTPException(status_code=404, detail="Campaign not found")
+    target = await db.get(CampaignTarget, target_id)
+    if not target or target.campaign_id != campaign_id: raise HTTPException(status_code=404, detail="Target not found")
+    
+    phone = target.phone_number
+    email = target.email
+    user_id = target.user_id
+    if not phone and user_id:
+        user = await db.get(User, user_id)
+        if user:
+            phone = user.phone_number
+            if not email: email = user.email
+
+    token_result = await db.execute(select(SimulationToken).where(
+        SimulationToken.campaign_id == campaign_id, SimulationToken.target_email == email))
+    token = token_result.scalar_one_or_none()
+    if not token:
+        token = SimulationToken(token=uuid.uuid4().hex, campaign_id=campaign_id, user_id=user_id,
+            target_email=email, expires_at=datetime.now(timezone.utc) + timedelta(hours=settings.TOKEN_EXPIRY_HOURS))
+        db.add(token)
+        await db.flush()
+    return campaign, target, phone, email, user_id, token.token
+
 async def generate_whatsapp_link(
     db: AsyncSession,
     campaign_id: int,
     target_id: int,
 ) -> str:
-    from fastapi import HTTPException
-    
-    # 1. Fetch Campaign and Target
-    campaign = await db.get(Campaign, campaign_id)
-    if not campaign:
-        raise HTTPException(status_code=404, detail="Campaign not found")
-        
-    target = await db.get(CampaignTarget, target_id)
-    if not target or target.campaign_id != campaign_id:
-        raise HTTPException(status_code=404, detail="Target not found in this campaign")
-    
-    phone = target.phone_number
-    email = target.email
-    user_id = target.user_id
-    
-    # If phone is missing from target, try to lookup the linked User
-    if not phone and user_id:
-        user = await db.get(User, user_id)
-        if user:
-            phone = user.phone_number
-            if not email:
-                email = user.email
-
+    campaign, target, phone, email, user_id, token_str = await _prepare_link_data(db, campaign_id, target_id)
     if not phone:
+        from fastapi import HTTPException
         raise HTTPException(status_code=400, detail="Target has no phone number associated")
 
-    # 2. Get/Create Simulation Token
-    # Try looking up by email and campaign first
-    token_result = await db.execute(
-        select(SimulationToken).where(
-            SimulationToken.campaign_id == campaign_id,
-            SimulationToken.target_email == email
-        )
-    )
-    token = token_result.scalar_one_or_none()
-    
-    if not token:
-        # Generate a new token if missing
-        token = SimulationToken(
-            token=uuid.uuid4().hex,
-            campaign_id=campaign_id,
-            user_id=user_id,
-            target_email=email,
-            expires_at=datetime.now(timezone.utc) + timedelta(hours=settings.TOKEN_EXPIRY_HOURS)
-        )
-        db.add(token)
-        await db.flush()
-
-    sim_link = f"{settings.SIM_BASE_URL}/phish/{token.token}"
+    sim_link = f"{settings.SIM_BASE_URL}/phish/{token_str}"
 
     # 3. Construct Message
     body = await _get_message_body(db, campaign, campaign.template_id, ChannelType.WHATSAPP,

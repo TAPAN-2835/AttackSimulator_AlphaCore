@@ -15,6 +15,9 @@ from campaigns.service import (
     start_campaign,
     complete_campaign,
     generate_whatsapp_link,
+    generate_telegram_link,
+    generate_instagram_link,
+    generate_linkedin_link,
 )
 from database import get_db
 
@@ -165,3 +168,39 @@ async def get_whatsapp_link(
     link = await generate_whatsapp_link(db, campaign_id, target_id)
     await db.commit()
     return {"whatsapp_link": link}
+
+
+@router.get("/{campaign_id}/telegram-link")
+async def get_telegram_link(
+    campaign_id: int,
+    target_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Generate a Telegram link for a specific campaign target."""
+    link = await generate_telegram_link(db, campaign_id, target_id)
+    await db.commit()
+    return {"telegram_link": link}
+
+
+@router.get("/{campaign_id}/instagram-link")
+async def get_instagram_link(
+    campaign_id: int,
+    target_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Generate an Instagram link for a specific campaign target."""
+    link = await generate_instagram_link(db, campaign_id, target_id)
+    await db.commit()
+    return {"instagram_link": link}
+
+
+@router.get("/{campaign_id}/linkedin-link")
+async def get_linkedin_link(
+    campaign_id: int,
+    target_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Generate a LinkedIn link for a specific campaign target."""
+    link = await generate_linkedin_link(db, campaign_id, target_id)
+    await db.commit()
+    return {"linkedin_link": link}
