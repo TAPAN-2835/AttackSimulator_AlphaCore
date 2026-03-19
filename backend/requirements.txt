@@ -41,3 +41,4 @@ sentence-transformers>=2.2.0
 
 # AI Providers
 openai>=1.0.0
+xhtml2pdf>=0.2.14
